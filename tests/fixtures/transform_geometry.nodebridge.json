@@ -1,0 +1,691 @@
+{
+  "graph": {
+    "connections": [
+      {
+        "id": "link_geo_in",
+        "metadata": {
+          "extra": {},
+          "mapping": {
+            "extra": {},
+            "ir_node_id": "",
+            "source_node_id": "",
+            "target_nodes": []
+          },
+          "provenance": {
+            "application": "",
+            "application_version": "",
+            "extra": {},
+            "graph_system": "",
+            "original_id": "",
+            "original_label": "",
+            "original_name": "",
+            "original_type": ""
+          },
+          "ui": {
+            "collapsed": false,
+            "color": null,
+            "frame_id": null,
+            "label": "",
+            "muted": false,
+            "position": null,
+            "width": null
+          }
+        },
+        "source_node": "node_in",
+        "source_socket": "in_geo",
+        "target_node": "node_xform",
+        "target_socket": "xf_geo"
+      },
+      {
+        "id": "link_geo_out",
+        "metadata": {
+          "extra": {},
+          "mapping": {
+            "extra": {},
+            "ir_node_id": "",
+            "source_node_id": "",
+            "target_nodes": []
+          },
+          "provenance": {
+            "application": "",
+            "application_version": "",
+            "extra": {},
+            "graph_system": "",
+            "original_id": "",
+            "original_label": "",
+            "original_name": "",
+            "original_type": ""
+          },
+          "ui": {
+            "collapsed": false,
+            "color": null,
+            "frame_id": null,
+            "label": "",
+            "muted": false,
+            "position": null,
+            "width": null
+          }
+        },
+        "source_node": "node_xform",
+        "source_socket": "xf_out",
+        "target_node": "node_out",
+        "target_socket": "out_geo"
+      },
+      {
+        "id": "link_offset",
+        "metadata": {
+          "extra": {},
+          "mapping": {
+            "extra": {},
+            "ir_node_id": "",
+            "source_node_id": "",
+            "target_nodes": []
+          },
+          "provenance": {
+            "application": "",
+            "application_version": "",
+            "extra": {},
+            "graph_system": "",
+            "original_id": "",
+            "original_label": "",
+            "original_name": "",
+            "original_type": ""
+          },
+          "ui": {
+            "collapsed": false,
+            "color": null,
+            "frame_id": null,
+            "label": "",
+            "muted": false,
+            "position": null,
+            "width": null
+          }
+        },
+        "source_node": "node_offset",
+        "source_socket": "off_out",
+        "target_node": "node_xform",
+        "target_socket": "xf_t"
+      }
+    ],
+    "graphs": [],
+    "id": "graph_0001",
+    "interface": {
+      "inputs": [
+        {
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "field_kind": "value",
+          "id": "iface_in",
+          "metadata": {
+            "extra": {},
+            "mapping": {
+              "extra": {},
+              "ir_node_id": "",
+              "source_node_id": "",
+              "target_nodes": []
+            },
+            "provenance": {
+              "application": "",
+              "application_version": "",
+              "extra": {},
+              "graph_system": "",
+              "original_id": "",
+              "original_label": "",
+              "original_name": "",
+              "original_type": ""
+            },
+            "ui": {
+              "collapsed": false,
+              "color": null,
+              "frame_id": null,
+              "label": "",
+              "muted": false,
+              "position": null,
+              "width": null
+            }
+          },
+          "name": "geometry"
+        }
+      ],
+      "outputs": [
+        {
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "field_kind": "value",
+          "id": "iface_out",
+          "metadata": {
+            "extra": {},
+            "mapping": {
+              "extra": {},
+              "ir_node_id": "",
+              "source_node_id": "",
+              "target_nodes": []
+            },
+            "provenance": {
+              "application": "",
+              "application_version": "",
+              "extra": {},
+              "graph_system": "",
+              "original_id": "",
+              "original_label": "",
+              "original_name": "",
+              "original_type": ""
+            },
+            "ui": {
+              "collapsed": false,
+              "color": null,
+              "frame_id": null,
+              "label": "",
+              "muted": false,
+              "position": null,
+              "width": null
+            }
+          },
+          "name": "geometry"
+        }
+      ]
+    },
+    "metadata": {
+      "extra": {},
+      "mapping": {
+        "extra": {},
+        "ir_node_id": "",
+        "source_node_id": "",
+        "target_nodes": []
+      },
+      "provenance": {
+        "application": "",
+        "application_version": "",
+        "extra": {},
+        "graph_system": "",
+        "original_id": "",
+        "original_label": "",
+        "original_name": "",
+        "original_type": ""
+      },
+      "ui": {
+        "collapsed": false,
+        "color": null,
+        "frame_id": null,
+        "label": "",
+        "muted": false,
+        "position": null,
+        "width": null
+      }
+    },
+    "name": "transform_geometry",
+    "nodes": [
+      {
+        "id": "node_in",
+        "inputs": [],
+        "metadata": {
+          "extra": {},
+          "mapping": {
+            "extra": {},
+            "ir_node_id": "node_in",
+            "source_node_id": "",
+            "target_nodes": []
+          },
+          "provenance": {
+            "application": "",
+            "application_version": "",
+            "extra": {},
+            "graph_system": "",
+            "original_id": "",
+            "original_label": "",
+            "original_name": "",
+            "original_type": ""
+          },
+          "ui": {
+            "collapsed": false,
+            "color": null,
+            "frame_id": null,
+            "label": "",
+            "muted": false,
+            "position": null,
+            "width": null
+          }
+        },
+        "operation": "graph.input",
+        "outputs": [
+          {
+            "data_type": "geometry",
+            "default": null,
+            "direction": "output",
+            "field_kind": "value",
+            "id": "in_geo",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "geometry"
+          }
+        ],
+        "parameters": []
+      },
+      {
+        "id": "node_offset",
+        "inputs": [
+          {
+            "data_type": "vector3",
+            "default": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "direction": "input",
+            "field_kind": "value",
+            "id": "off_a",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "a"
+          },
+          {
+            "data_type": "vector3",
+            "default": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "direction": "input",
+            "field_kind": "value",
+            "id": "off_b",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "b"
+          }
+        ],
+        "metadata": {
+          "extra": {},
+          "mapping": {
+            "extra": {},
+            "ir_node_id": "node_offset",
+            "source_node_id": "",
+            "target_nodes": []
+          },
+          "provenance": {
+            "application": "",
+            "application_version": "",
+            "extra": {},
+            "graph_system": "",
+            "original_id": "",
+            "original_label": "",
+            "original_name": "",
+            "original_type": ""
+          },
+          "ui": {
+            "collapsed": false,
+            "color": null,
+            "frame_id": null,
+            "label": "",
+            "muted": false,
+            "position": null,
+            "width": null
+          }
+        },
+        "operation": "vector.add",
+        "outputs": [
+          {
+            "data_type": "vector3",
+            "default": null,
+            "direction": "output",
+            "field_kind": "value",
+            "id": "off_out",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "vector"
+          }
+        ],
+        "parameters": []
+      },
+      {
+        "id": "node_out",
+        "inputs": [
+          {
+            "data_type": "geometry",
+            "default": null,
+            "direction": "input",
+            "field_kind": "value",
+            "id": "out_geo",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "geometry"
+          }
+        ],
+        "metadata": {
+          "extra": {},
+          "mapping": {
+            "extra": {},
+            "ir_node_id": "node_out",
+            "source_node_id": "",
+            "target_nodes": []
+          },
+          "provenance": {
+            "application": "",
+            "application_version": "",
+            "extra": {},
+            "graph_system": "",
+            "original_id": "",
+            "original_label": "",
+            "original_name": "",
+            "original_type": ""
+          },
+          "ui": {
+            "collapsed": false,
+            "color": null,
+            "frame_id": null,
+            "label": "",
+            "muted": false,
+            "position": null,
+            "width": null
+          }
+        },
+        "operation": "graph.output",
+        "outputs": [],
+        "parameters": []
+      },
+      {
+        "id": "node_xform",
+        "inputs": [
+          {
+            "data_type": "geometry",
+            "default": null,
+            "direction": "input",
+            "field_kind": "value",
+            "id": "xf_geo",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "geometry"
+          },
+          {
+            "data_type": "vector3",
+            "default": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "direction": "input",
+            "field_kind": "value",
+            "id": "xf_t",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "translation"
+          }
+        ],
+        "metadata": {
+          "extra": {},
+          "mapping": {
+            "extra": {},
+            "ir_node_id": "node_xform",
+            "source_node_id": "bpy_node_xform",
+            "target_nodes": []
+          },
+          "provenance": {
+            "application": "",
+            "application_version": "",
+            "extra": {},
+            "graph_system": "",
+            "original_id": "",
+            "original_label": "",
+            "original_name": "Transform Geometry",
+            "original_type": "GeometryNodeTransform"
+          },
+          "ui": {
+            "collapsed": false,
+            "color": null,
+            "frame_id": null,
+            "label": "",
+            "muted": false,
+            "position": null,
+            "width": null
+          }
+        },
+        "operation": "geometry.transform",
+        "outputs": [
+          {
+            "data_type": "geometry",
+            "default": null,
+            "direction": "output",
+            "field_kind": "value",
+            "id": "xf_out",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "geometry"
+          }
+        ],
+        "parameters": []
+      }
+    ],
+    "provenance": {
+      "application": "blender",
+      "application_version": "4.2",
+      "extra": {},
+      "graph_system": "geometry",
+      "original_id": "",
+      "original_label": "",
+      "original_name": "",
+      "original_type": ""
+    },
+    "system": "geometry"
+  },
+  "ir_version": "1",
+  "nodebridge_version": "0.1.0",
+  "source": {
+    "application": "blender",
+    "application_version": "4.2",
+    "extra": {},
+    "graph_system": "geometry",
+    "original_id": "",
+    "original_label": "",
+    "original_name": "",
+    "original_type": ""
+  }
+}

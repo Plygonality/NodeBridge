@@ -1,0 +1,220 @@
+{
+  "graph": {
+    "connections": [],
+    "graphs": [],
+    "id": "graph_0001",
+    "interface": {
+      "inputs": [],
+      "outputs": []
+    },
+    "metadata": {
+      "extra": {},
+      "mapping": {
+        "extra": {},
+        "ir_node_id": "",
+        "source_node_id": "",
+        "target_nodes": []
+      },
+      "provenance": {
+        "application": "",
+        "application_version": "",
+        "extra": {},
+        "graph_system": "",
+        "original_id": "",
+        "original_label": "",
+        "original_name": "",
+        "original_type": ""
+      },
+      "ui": {
+        "collapsed": false,
+        "color": null,
+        "frame_id": null,
+        "label": "",
+        "muted": false,
+        "position": null,
+        "width": null
+      }
+    },
+    "name": "math_add",
+    "nodes": [
+      {
+        "id": "node_add",
+        "inputs": [
+          {
+            "data_type": "float",
+            "default": 1.0,
+            "direction": "input",
+            "field_kind": "value",
+            "id": "sock_a",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "a"
+          },
+          {
+            "data_type": "float",
+            "default": 2.0,
+            "direction": "input",
+            "field_kind": "value",
+            "id": "sock_b",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "b"
+          }
+        ],
+        "metadata": {
+          "extra": {},
+          "mapping": {
+            "extra": {},
+            "ir_node_id": "node_add",
+            "source_node_id": "",
+            "target_nodes": []
+          },
+          "provenance": {
+            "application": "",
+            "application_version": "",
+            "extra": {},
+            "graph_system": "",
+            "original_id": "",
+            "original_label": "",
+            "original_name": "Math",
+            "original_type": "ShaderNodeMath"
+          },
+          "ui": {
+            "collapsed": false,
+            "color": null,
+            "frame_id": null,
+            "label": "Add",
+            "muted": false,
+            "position": [
+              120.0,
+              40.0
+            ],
+            "width": null
+          }
+        },
+        "operation": "math.add",
+        "outputs": [
+          {
+            "data_type": "float",
+            "default": null,
+            "direction": "output",
+            "field_kind": "value",
+            "id": "sock_out",
+            "metadata": {
+              "extra": {},
+              "mapping": {
+                "extra": {},
+                "ir_node_id": "",
+                "source_node_id": "",
+                "target_nodes": []
+              },
+              "provenance": {
+                "application": "",
+                "application_version": "",
+                "extra": {},
+                "graph_system": "",
+                "original_id": "",
+                "original_label": "",
+                "original_name": "",
+                "original_type": ""
+              },
+              "ui": {
+                "collapsed": false,
+                "color": null,
+                "frame_id": null,
+                "label": "",
+                "muted": false,
+                "position": null,
+                "width": null
+              }
+            },
+            "name": "value"
+          }
+        ],
+        "parameters": [
+          {
+            "data_type": "string",
+            "metadata": {},
+            "name": "operation",
+            "value": "ADD"
+          }
+        ]
+      }
+    ],
+    "provenance": {
+      "application": "blender",
+      "application_version": "",
+      "extra": {},
+      "graph_system": "geometry",
+      "original_id": "",
+      "original_label": "",
+      "original_name": "",
+      "original_type": ""
+    },
+    "system": "geometry"
+  },
+  "ir_version": "1",
+  "nodebridge_version": "0.1.0",
+  "source": {
+    "application": "blender",
+    "application_version": "",
+    "extra": {},
+    "graph_system": "geometry",
+    "original_id": "",
+    "original_label": "",
+    "original_name": "",
+    "original_type": ""
+  }
+}
