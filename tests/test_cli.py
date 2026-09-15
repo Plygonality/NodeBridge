@@ -44,3 +44,17 @@ def test_cli_version(capsys: object) -> None:
     assert main(["--version"]) == 0
     output = capsys.readouterr().out  # type: ignore[attr-defined]
     assert "NodeBridge 0.1.0" in output
+
+
+def test_module_entrypoint_version() -> None:
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "nodebridge", "--version"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert "NodeBridge 0.1.0" in result.stdout

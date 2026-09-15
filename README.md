@@ -1,97 +1,210 @@
 # NodeBridge
 
-NodeBridge is an extensible Python framework for translating procedural node
-systems between digital content creation tools and game engines.
+NodeBridge translates procedural **semantics** between applications. It does
+not merely rename nodes.
 
-It inspects a source graph, converts it into a normalized Intermediate
-Representation (IR), analyses that representation, and generates a native
-procedural system in a target application.
-
-**NodeBridge translates procedural semantics between applications. It does not
-merely translate node names.**
+Today (Milestone 1) you work in a **terminal** and **Python**. You inspect,
+validate, and report on Intermediate Representation (IR) files. Blender
+extraction and Houdini / Unreal generation are not wired up yet.
 
 ```
-Blender
-   │
-   ▼
-Source Adapter (bpy)
-   │
-   ▼
-Normalized Intermediate Representation
-   │
-   ├───────────────┐
-   ▼               ▼
-Houdini Backend    Unreal Engine Backend
-   │               │
-   ▼               ▼
-Native SOP graph   Native UE5 system
+Blender  →  IR JSON  →  Houdini SOP / Unreal system
+              ▲
+     you are here
 ```
 
-## What NodeBridge is
+---
 
-* A software-independent procedural graph translation system
-* A strongly structured IR for operations, data flow, types, and metadata
-* A registry of semantic operations that can grow incrementally
-* A place to classify translation quality instead of guessing silently
-* A foundation for Houdini, Unreal Engine 5, and later additional hosts
+## Where you use it
 
-## What NodeBridge is not
-
-* A Blender exporter that string-replaces node names
-* A one-to-one node lookup table
-* A requirement that every Blender node has an identical counterpart
-* A live IPC bridge (that is a later milestone)
-* A tool that silently approximates unsupported behavior
-
-## Current status
-
-**Milestone 1 — Core IR** is implemented.
-
-| Layer | Status |
+| You are in | You do this |
 | --- | --- |
-| IR data model | Implemented |
-| Type system | Implemented |
-| Validation | Implemented |
-| JSON serialization | Implemented |
-| Diagnostics / reports | Implemented |
-| Translation registry | Implemented (no mappings yet) |
-| Blender extraction | Not started (Milestone 2) |
-| Houdini generation | Not started (Milestone 3) |
-| Unreal generation | Not started (Milestone 7) |
-| Blender add-on UI | Scaffold only (Milestone 6) |
+| **Terminal**, repo root | Install, inspect, validate, report, run tests |
+| **Python** (REPL or a `.py` file) | Build graphs, save/load `.nodebridge.json` |
+| **Blender** Geometry/Shader/Compositor editor | Export a node tree — *not available yet* (Milestone 2 / 6) |
+| **Houdini** Python Source Editor | Run generated SOP scripts — *not available yet* (Milestone 3) |
+| **Unreal** Python console | Run generated material / PCG scripts — *not available yet* (Milestone 7) |
 
-The core package imports without Blender, Houdini, or Unreal installed.
+You do **not** need Blender, Houdini, or Unreal installed for anything on
+this page.
 
-## Current supported applications
+---
 
-| Role | Application | Status |
-| --- | --- | --- |
-| Source | Blender | Planned (adapter contract only) |
-| Target | SideFX Houdini | Planned (backend contract only) |
-| Target | Unreal Engine 5 | Planned (backend contract only) |
+## Step 1 — Open a terminal in the repo
 
-## Current supported graph systems
-
-| System | Extract | Translate |
-| --- | --- | --- |
-| Geometry Nodes | Milestone 2 | Milestone 3 (Houdini SOP) |
-| Shader Nodes | Later | Milestone 7 candidate |
-| Compositor Nodes | Later | Later |
-
-## Installation
-
-Requires Python 3.11+.
+1. Clone or open the NodeBridge repository.
+2. `cd` into the repo root (the folder that contains `pyproject.toml`).
 
 ```bash
-python -m pip install -e ".[dev]"
+cd /path/to/NodeBridge
 ```
 
-## Basic usage
+3. Confirm you are in the right place:
 
-Milestone 1 works with IR documents, not live Blender trees.
+```bash
+ls pyproject.toml src/nodebridge README.md
+```
+
+You should see those three paths.
+
+---
+
+## Step 2 — Install NodeBridge
+
+Requires **Python 3.11 or newer**.
+
+1. (Optional but recommended) create a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+```
+
+2. Install the package in editable mode, with test tools:
+
+```bash
+python3 -m pip install -e ".[dev]"
+```
+
+3. Confirm the CLI:
+
+```bash
+python3 -m nodebridge --version
+```
+
+Expected output:
+
+```text
+NodeBridge 0.1.0 (IR version 1)
+```
+
+If `python3 -m nodebridge` cannot find the module, you are not in the
+environment where you installed the package. Activate `.venv` and retry.
+
+The console script `nodebridge` is also installed. Use it if it is on
+your `PATH`:
+
+```bash
+nodebridge --version
+```
+
+The rest of this guide uses `python3 -m nodebridge` because it works
+without changing `PATH`.
+
+---
+
+## Step 3 — Inspect a sample graph
+
+This is the fastest way to see what an IR document looks like.
+
+1. Stay in the repo root.
+2. Run:
+
+```bash
+python3 -m nodebridge inspect tests/fixtures/transform_geometry.nodebridge.json
+```
+
+3. You should see a summary similar to:
+
+```text
+NodeBridge IR 1 (package 0.1.0)
+Source: blender
+Graph: transform_geometry (graph_0001)
+System: geometry
+Nodes: 4
+Connections: 3
+Nested graphs: 0
+Operations:
+  node_in: graph.input
+  node_offset: vector.add
+  node_out: graph.output
+  node_xform: geometry.transform
+```
+
+That file is a stand-in for a Blender Geometry Nodes tree: geometry in,
+a vector add, a transform, geometry out.
+
+Open the same file in any text editor if you want to read the JSON.
+Do not hand-edit it unless you are debugging — the Python API is the
+supported way to build graphs.
+
+More on these files: [tests/fixtures/README.md](tests/fixtures/README.md).
+
+---
+
+## Step 4 — Validate a graph
+
+1. Run:
+
+```bash
+python3 -m nodebridge validate tests/fixtures/math_add.nodebridge.json
+```
+
+2. Expected first line:
+
+```text
+OK
+```
+
+Exit code `0` means the graph is structurally valid. Warnings may still
+print below `OK` (for example an unknown operation). Exit code `1` means
+the graph is invalid (broken connections, missing nodes, and so on).
+
+---
+
+## Step 5 — Run a compatibility report
+
+This classifies every operation against a target. No Houdini or Unreal
+code is generated.
+
+1. Report against Houdini:
+
+```bash
+python3 -m nodebridge report tests/fixtures/transform_geometry.nodebridge.json --target houdini
+```
+
+2. You should see a block starting with:
+
+```text
+NodeBridge Translation Report
+=============================
+Source:
+blender geometry
+Target:
+houdini
+```
+
+3. Counts will currently show **Unsupported** for every node. That is
+   expected: no backend mappings exist yet. The report is still the
+   workflow you will use after Milestone 3 — it will never silently
+   pretend a mapping is exact.
+
+4. Try Unreal the same way:
+
+```bash
+python3 -m nodebridge report tests/fixtures/transform_geometry.nodebridge.json --target unreal
+```
+
+`python3 -m nodebridge translate …` exists as a command name but is
+**not implemented**. It will print an error and exit `2`.
+
+---
+
+## Step 6 — Build a graph in Python
+
+**Where:** a Python REPL (`python3`) or any `.py` file. Working directory
+does not matter as long as the package is installed.
+
+1. Start Python:
+
+```bash
+python3
+```
+
+2. Paste:
 
 ```python
-from nodebridge import GraphBuilder, GraphSystem, DataType, dumps, loads, validate_graph
+from nodebridge import GraphBuilder, GraphSystem, DataType, validate_graph, dumps
 
 builder = GraphBuilder(name="example", system=GraphSystem.GEOMETRY)
 add = builder.node("math.add")
@@ -100,82 +213,187 @@ builder.input(add, "b", DataType.FLOAT, default=2.0)
 builder.output(add, "value", DataType.FLOAT)
 
 result = validate_graph(builder.graph)
-assert result.ok
-
-json_text = dumps(builder.graph)
-restored = loads(json_text).graph
+print("valid:", result.ok)
+print(dumps(builder.graph))
 ```
 
-CLI:
+3. You should see `valid: True` and a JSON document with
+   `"ir_version": "1"` and one `math.add` node.
+
+4. Wire two nodes together (transform + translation):
+
+```python
+from nodebridge import GraphBuilder, GraphSystem, DataType
+
+b = GraphBuilder(name="move_up", system=GraphSystem.GEOMETRY)
+
+incoming = b.node("graph.input")
+geo_in = b.output(incoming, "geometry", DataType.GEOMETRY)
+
+offset = b.node("vector.add")
+b.input(offset, "a", DataType.VECTOR3, default=(0.0, 0.0, 1.0))
+b.input(offset, "b", DataType.VECTOR3, default=(0.0, 0.0, 0.0))
+vec_out = b.output(offset, "vector", DataType.VECTOR3)
+
+xform = b.node("geometry.transform")
+geo_sock = b.input(xform, "geometry", DataType.GEOMETRY)
+t_sock = b.input(xform, "translation", DataType.VECTOR3)
+geo_out = b.output(xform, "geometry", DataType.GEOMETRY)
+
+outgoing = b.node("graph.output")
+final = b.input(outgoing, "geometry", DataType.GEOMETRY)
+
+b.connect(incoming, geo_in, xform, geo_sock)
+b.connect(offset, vec_out, xform, t_sock)
+b.connect(xform, geo_out, outgoing, final)
+
+print(list(b.graph.nodes))
+print(b.graph.topological_order())
+```
+
+`operation` is a semantic name (`geometry.transform`), not a Blender UI
+name (`GeometryNodeTransform`). Source names belong in provenance when
+an adapter fills them in.
+
+---
+
+## Step 7 — Save and reload JSON
+
+**Where:** still in Python. The file can live anywhere; this example
+writes next to your current working directory.
+
+```python
+from pathlib import Path
+from nodebridge import load, dump, validate_graph
+
+# `b` is the GraphBuilder from Step 6
+path = Path("move_up.nodebridge.json")
+dump(b.graph, path)
+
+document = load(path)
+print(document.graph.name)
+print(validate_graph(document.graph).ok)
+```
+
+Or from the terminal, after the file exists:
 
 ```bash
-nodebridge inspect graph.nodebridge.json
-nodebridge validate graph.nodebridge.json
-nodebridge report graph.nodebridge.json --target houdini
+python3 -m nodebridge inspect move_up.nodebridge.json
+python3 -m nodebridge validate move_up.nodebridge.json
 ```
 
-`nodebridge translate` is reserved for Milestone 3.
+Round-trip rule: IR → JSON → IR must keep operations, sockets,
+connections, types, and IDs.
 
-## Architecture
+---
 
-Layers are strictly separated:
+## Step 8 — Run the test suite
 
-```
-Source Adapter → IR → Semantic Translation → Target Backend
-```
-
-* **Adapters** inspect a host graph and emit IR. Only adapters may import `bpy`.
-* **IR** stores operations, sockets, connections, types, and provenance.
-* **Translators** map semantic operations to backend fragments via a registry.
-* **Backends** generate native graphs. Only backends may import `hou` or Unreal Python.
-
-See [docs/architecture.md](docs/architecture.md) and
-[docs/intermediate_representation.md](docs/intermediate_representation.md).
-
-## Example workflow (target state)
-
-1. Author a Geometry Nodes tree in Blender.
-2. Extract it to `graph.nodebridge.json`.
-3. Analyse compatibility for Houdini.
-4. Generate a Houdini Python script.
-5. Run the script inside Houdini to rebuild an editable SOP network.
-6. Read the translation report for anything that was not exact.
-
-Today, steps 2–4 can be exercised with hand-built IR fixtures.
-
-## Compatibility
-
-See [docs/compatibility.md](docs/compatibility.md). Coverage is intentionally
-narrow. The catalog starts with a small set of semantic operations so the IR
-can stay coherent.
-
-## Limitations
-
-* No Blender extraction yet
-* No Houdini or Unreal code generation yet
-* Operation catalog is a seed, not a complete Geometry Nodes coverage list
-* Rewrite passes exist as a pipeline only (identity / test doubles)
-* Nested groups are represented, but group semantics are not yet lowered
-* Field evaluation differences between applications are recorded, not solved
-
-## Roadmap
-
-The full milestone plan is in [docs/roadmap.md](docs/roadmap.md).
-
-1. Core IR — **this release**
-2. Blender Geometry Nodes extraction (small subset)
-3. Houdini SOP prototype
-4. Translation diagnostics
-5. More Geometry Nodes
-6. Blender add-on
-7. Unreal prototype
-8. Advanced semantic translation
-
-## Tests
+**Where:** repo root, after Step 2.
 
 ```bash
-python -m pytest
+python3 -m pytest
 ```
+
+Expected: all tests passed. Add `-v` if you want the per-file list.
+
+```bash
+python3 -m pytest -v
+```
+
+---
+
+## Step 9 — (Later) Export from Blender
+
+**Not implemented.** This is the intended click path so you know where
+the add-on will live.
+
+1. Open **Blender** (4.2+).
+2. Edit → Preferences → Add-ons → Install.
+3. Select `blender_addon/` (Milestone 6 will make this installable).
+4. Enable **NodeBridge**.
+5. Open a node editor:
+   - Geometry Nodes workspace, or
+   - Shader Editor, or
+   - Compositor.
+6. Press `N` to open the sidebar.
+7. Click the **NodeBridge** tab.
+8. Choose source tree and target (Houdini / Unreal).
+9. Click **Analyse**, then **Export** / **Generate**.
+
+Until that ships, build or inspect IR files as in Steps 3–7.
+
+Geometry Nodes walkthrough (planned):
+[examples/geometry_nodes/README.md](examples/geometry_nodes/README.md)
+
+Shader walkthrough (planned):
+[examples/shaders/README.md](examples/shaders/README.md)
+
+Compositor walkthrough (planned):
+[examples/compositor/README.md](examples/compositor/README.md)
+
+---
+
+## Step 10 — (Later) Rebuild in Houdini
+
+**Not implemented.** Intended path after Milestone 3:
+
+1. Generate a script (this command fails today):
+
+```bash
+python3 -m nodebridge translate graph.nodebridge.json --target houdini --output houdini_output.py
+```
+
+2. Open **Houdini**.
+3. Windows → Python Source Editor (or a Python SOP).
+4. Open `houdini_output.py` and run it.
+5. A **NodeBridge** SOP subnet should appear with native, editable nodes.
+
+---
+
+## Step 11 — (Later) Rebuild in Unreal Engine 5
+
+**Not implemented.** Intended path after Milestone 7:
+
+1. Generate a script (this command fails today):
+
+```bash
+python3 -m nodebridge translate graph.nodebridge.json --target unreal --output unreal_output.py
+```
+
+2. Open the Unreal Editor with Python enabled.
+3. Window → Developer Tools → Output Log, or the Python console.
+4. Paste or `exec(open(r"unreal_output.py").read())`.
+5. The matching Material / PCG / Geometry Script asset should appear.
+
+---
+
+## Command cheat sheet
+
+| Goal | Command |
+| --- | --- |
+| Version | `python3 -m nodebridge --version` |
+| Summarize a file | `python3 -m nodebridge inspect path.json` |
+| Check structure | `python3 -m nodebridge validate path.json` |
+| Classify vs a target | `python3 -m nodebridge report path.json --target houdini` |
+| Generate host code | *not implemented* |
+| Tests | `python3 -m pytest` |
+
+---
+
+## What this is / is not
+
+**Is:** a software-independent IR, a growing operation catalog, a
+registry for one-to-many translations, and a report that refuses to
+hide approximations.
+
+**Is not:** a Blender exporter that string-replaces node names, a live
+IPC bridge, or a tool that silently produces a different graph.
+
+Architecture: [docs/architecture.md](docs/architecture.md)
+IR details: [docs/intermediate_representation.md](docs/intermediate_representation.md)
+Roadmap: [docs/roadmap.md](docs/roadmap.md)
+Compatibility: [docs/compatibility.md](docs/compatibility.md)
 
 ## License
 
