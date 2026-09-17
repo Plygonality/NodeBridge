@@ -1,32 +1,31 @@
 # Compatibility matrix
 
-Statuses use the IR translation vocabulary. `TBD` means the backend path
-does not exist yet. `—` means the operation is not extracted yet.
+Statuses use the IR fidelity vocabulary. This table describes the
+**implemented construction-plan mappings** for the vertical slice, not
+live DCC execution.
 
-Quality labels, once a backend exists:
+There is no compatibility percentage.
 
-* Exact
-* Equivalent
-* Approximated
-* Partial
-* Unsupported
-
-| Operation | Blender | Houdini | UE5 |
+| Operation | Blender GN | Houdini SOP | Unreal PCG |
 | --- | --- | --- | --- |
-| `math.add` | Planned (M2) | TBD (M3) | TBD |
-| `math.subtract` | Planned (M2) | TBD (M3) | TBD |
-| `math.multiply` | Planned (M2) | TBD (M3) | TBD |
-| `math.divide` | Planned (M2) | TBD (M3) | TBD |
-| `vector.add` | Planned (M2) | TBD (M3) | TBD |
-| `geometry.transform` | Planned (M2) | TBD (M3) | TBD |
-| `geometry.join` | Planned (M2) | TBD (M3) | TBD |
-| `geometry.modify_position` | Planned (M2) | TBD (M3) | TBD |
-| `geometry.instance` | Later (M5) | TBD | TBD |
-| `geometry.realize_instances` | Later (M5) | TBD | TBD |
-| `procedural.noise` | Later (M5) | TBD | TBD |
-| `shader.principled_surface` | Later | TBD | TBD (M7 candidate) |
-| `color.mix` | Later | TBD | TBD |
+| `graph.input` / `graph.output` | EXACT | EXACT | EXACT |
+| `geometry.transform` | EXACT | EXACT | EXACT |
+| `geometry.join` | EXACT | EXACT | EXACT |
+| `geometry.primitive` | EXACT | EXACT | APPROXIMATE |
+| `points.distribute` | EXACT | EXACT | EXACT |
+| `geometry.instance` | EXACT | LOWERED | APPROXIMATE |
+| `geometry.realize_instances` | EXACT | LOWERED | APPROXIMATE |
+| `random.float` | EXACT | EXACT | EXACT |
+| `random.vector` | EXACT | LOWERED | APPROXIMATE |
+| `math.add` (and siblings) | EXACT | CUSTOM_CODE (VEX) | UNSUPPORTED |
+| `vector.add` (and siblings) | EXACT | CUSTOM_CODE (VEX) | UNSUPPORTED |
+| `math.clamp` | EXACT | CUSTOM_CODE | UNSUPPORTED |
+| `geometry.modify_position` | EXACT | CUSTOM_CODE | UNSUPPORTED |
+| `attribute.read` / `write` | EXACT | APPROXIMATE | APPROXIMATE |
+| `shader.principled_surface` | mapped, not in slice | UNSUPPORTED | UNSUPPORTED |
 
-IR-only operations already have names and validation, but no host
-mappings. That is intentional: the catalog must grow faster than the
-lookup tables.
+Unregistered operations compile to a visible `nodebridge.unsupported`
+placeholder plus an error diagnostic. They are never silently dropped.
+
+Shader, compositor, and most Geometry Nodes / SOP / PCG catalogs are
+**out of scope** for 0.2.

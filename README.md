@@ -1,82 +1,114 @@
 # NodeBridge
 
-NodeBridge is an extensible Python framework for translating procedural node
-systems between digital content creation tools and game engines.
+NodeBridge is a **cross-DCC compiler for procedural graphs**.
 
-It inspects a source graph, converts it into a normalized Intermediate
-Representation (IR), analyses that representation, and generates a native
-procedural system in a target application.
+A procedural system authored in one supported DCC or game engine should be convertible into an editable native procedural system in another supported application — without requiring the artist to rebuild the graph from scratch.
 
-**NodeBridge translates procedural semantics between applications. It does not
-merely translate node names.**
+**NodeBridge translates procedural semantics, not node names.**
 
 ```
-Blender
-   │
-   ▼
-Source Adapter (bpy)
-   │
-   ▼
-Normalized Intermediate Representation
-   │
-   ├───────────────┐
-   ▼               ▼
-Houdini Backend    Unreal Engine Backend
-   │               │
-   ▼               ▼
-Native SOP graph   Native UE5 system
+                         NodeBridge
+                    Semantic Compiler
+
+                           IR
+                           │
+                ┌──────────┼──────────┐
+                │          │          │
+             Blender    Houdini     Unreal
+                ↕          ↕          ↕
+               GN        SOP/VEX      PCG
 ```
+
+Each host can operate as a frontend (native → IR), a backend (IR → native), or both.
+
+## Why this is hard
+
+Geometry Nodes, Houdini SOPs, and Unreal PCG do not share a node catalog. A Blender *Distribute Points on Faces* node is not a Houdini *Scatter* node and is not an Unreal *Surface Sampler*. They sometimes describe related ideas — sample a surface, produce points — and sometimes they do not.
+
+Pairwise converters (`Blender → Houdini`, `Houdini → Unreal`, …) do not scale, and they encode the false assumption that one source node equals one target node.
+
+NodeBridge instead compiles:
+
+```
+Native DCC graph
+    → frontend / source adapter
+    → canonical semantic IR
+    → analysis + normalization + rewrite + lowering
+    → target backend
+    → editable native DCC graph
+```
+
+Future hosts (Maya/Bifrost, Substance Designer, Nuke, …) should plug in through the host contract, not by editing every compiler module.
 
 ## What NodeBridge is
 
-* A software-independent procedural graph translation system
-* A strongly structured IR for operations, data flow, types, and metadata
+* A software-independent procedural graph compiler
+* A canonical semantic IR for operations, data flow, types, and provenance
 * A registry of semantic operations that can grow incrementally
-* A place to classify translation quality instead of guessing silently
-* A foundation for Houdini, Unreal Engine 5, and later additional hosts
+* A host plugin architecture (frontend + backend + capabilities)
+* A translation planner that classifies every operation before generation
+* Structured fidelity: `EXACT`, `LOWERED`, `APPROXIMATE`, `CUSTOM_CODE`, `BAKED`, `UNSUPPORTED`
 
 ## What NodeBridge is not
 
 * A Blender exporter that string-replaces node names
-* A one-to-one node lookup table
-* A requirement that every Blender node has an identical counterpart
-* A live IPC bridge (that is a later milestone)
+* A collection of pairwise converters
+* A requirement that graph topology survives translation
+* A live IPC bridge between running applications
 * A tool that silently approximates unsupported behavior
+* A promise of perfect round-trip equivalence
 
-## Current status
+## Current status (implemented today)
 
-**Milestone 1 — Core IR** is implemented.
+**Version 0.2** implements the many-to-many compiler architecture and a Blender ↔ Houdini vertical slice at the **pure translation / construction-plan** level.
 
 | Layer | Status |
 | --- | --- |
-| IR data model | Implemented |
+| Canonical semantic IR | Implemented |
 | Type system | Implemented |
-| Validation | Implemented |
-| JSON serialization | Implemented |
-| Diagnostics / reports | Implemented |
-| Translation registry | Implemented (no mappings yet) |
-| Blender extraction | Not started (Milestone 2) |
-| Houdini generation | Not started (Milestone 3) |
-| Unreal generation | Not started (Milestone 7) |
-| Blender add-on UI | Scaffold only (Milestone 6) |
+| Semantic operation catalog (narrow) | Implemented |
+| Validation + JSON serialization | Implemented |
+| Host plugin registry | Implemented |
+| Capability model | Implemented |
+| Compiler pipeline (validate → normalize → plan → lower → report) | Implemented |
+| Blender Geometry Nodes frontend | Implemented for a small subset, fixture/duck-typed trees |
+| Blender Geometry Nodes backend | Implemented as construction plans + bpy script text |
+| Houdini SOP frontend | Implemented for a small subset, fixture/duck-typed networks |
+| Houdini SOP backend | Implemented as construction plans + hou script text + VEX snippets |
+| Unreal PCG frontend | Architecture + fixtures; live `unreal` inspection is experimental |
+| Unreal PCG backend | Construction plans + experimental UE 5.7 Python text |
+| Live `bpy` / `hou` / `unreal` execution | Not run in CI; optional runtime modules use importlib |
+| Blender add-on UI | Scaffold only |
 
 The core package imports without Blender, Houdini, or Unreal installed.
 
-## Current supported applications
+**Not implemented today:** live editor integration, a large node catalog, shader/compositor coverage, baking evaluators, Maya/Substance/Nuke hosts, and perfect round-trips.
 
-| Role | Application | Status |
-| --- | --- | --- |
-| Source | Blender | Planned (adapter contract only) |
-| Target | SideFX Houdini | Planned (backend contract only) |
-| Target | Unreal Engine 5 | Planned (backend contract only) |
+## Supported hosts
 
-## Current supported graph systems
+| Host | Graph system | Frontend | Backend | Runtime API |
+| --- | --- | --- | --- | --- |
+| Blender | Geometry Nodes | Yes (fixtures + optional bpy) | Yes (plan + bpy script) | Optional, Blender only |
+| Houdini | SOP / VEX | Yes (fixtures + optional hou) | Yes (plan + hou script) | Optional, Houdini only |
+| Unreal Engine 5 | PCG | Yes (fixtures; live inspect limited) | Yes (plan + experimental Python) | Editor-only, UE 5.7+ experimental |
 
-| System | Extract | Translate |
-| --- | --- | --- |
-| Geometry Nodes | Milestone 2 | Milestone 3 (Houdini SOP) |
-| Shader Nodes | Later | Milestone 7 candidate |
-| Compositor Nodes | Later | Later |
+## Supported semantic operations (vertical slice)
+
+The catalog is larger than the well-tested slice. The slice with cross-host mappings is approximately:
+
+* `graph.input` / `graph.output`
+* `geometry.primitive`
+* `geometry.transform`
+* `geometry.join`
+* `points.distribute` (surface sampling)
+* `random.float` / `random.vector`
+* `geometry.instance`
+* `geometry.realize_instances`
+* `math.*` (add, subtract, multiply, divide, min, max, clamp, map_range)
+* `vector.*` (add, subtract, scale, normalize, dot, cross, distance)
+* `attribute.read` / `attribute.write`
+
+See [docs/semantic_operations.md](docs/semantic_operations.md) and [docs/compatibility.md](docs/compatibility.md).
 
 ## Installation
 
@@ -88,10 +120,10 @@ python -m pip install -e ".[dev]"
 
 ## Basic usage
 
-Milestone 1 works with IR documents, not live Blender trees.
+Build IR without any DCC installed:
 
 ```python
-from nodebridge import GraphBuilder, GraphSystem, DataType, dumps, loads, validate_graph
+from nodebridge import GraphBuilder, GraphSystem, DataType, compile_graph, dumps, validate_graph
 
 builder = GraphBuilder(name="example", system=GraphSystem.GEOMETRY)
 add = builder.node("math.add")
@@ -99,11 +131,23 @@ builder.input(add, "a", DataType.FLOAT, default=1.0)
 builder.input(add, "b", DataType.FLOAT, default=2.0)
 builder.output(add, "value", DataType.FLOAT)
 
-result = validate_graph(builder.graph)
-assert result.ok
-
+assert validate_graph(builder.graph).ok
 json_text = dumps(builder.graph)
-restored = loads(json_text).graph
+
+result = compile_graph(builder.graph, "houdini")
+print(result.report.format_text())
+print(result.native_graph.nodes[0].type)  # attribwrangle for math.add
+```
+
+Compile a native Blender fixture toward Houdini:
+
+```python
+from nodebridge import compile_native
+from nodebridge.hosts.blender import BlenderFrontend
+
+# native_graph is a NativeGraph or dict describing Geometry Nodes
+document = BlenderFrontend().extract(native_graph)
+result = compile_native(native_graph, "houdini")
 ```
 
 CLI:
@@ -111,65 +155,57 @@ CLI:
 ```bash
 nodebridge inspect graph.nodebridge.json
 nodebridge validate graph.nodebridge.json
-nodebridge report graph.nodebridge.json --target houdini
+nodebridge capabilities houdini
+nodebridge plan graph.nodebridge.json --target houdini
+nodebridge report graph.nodebridge.json --target unreal
+nodebridge translate graph.nodebridge.json --target houdini --output houdini.native.json --script houdini_build.py
+nodebridge translate --source blender --target houdini --input scatter.native.json
 ```
 
-`nodebridge translate` is reserved for Milestone 3.
+`.nodebridge.json` files are data. Loading them never executes Python, VEX, or Unreal scripts. Generation and execution are explicit stages.
 
 ## Architecture
 
-Layers are strictly separated:
-
 ```
-Source Adapter → IR → Semantic Translation → Target Backend
+Native graph  →  Host frontend  →  Semantic IR  →  Compiler passes
+                                                      │
+                                                      ▼
+Native graph  ←  Host backend   ←  Lowering / plan  ←─┘
 ```
 
-* **Adapters** inspect a host graph and emit IR. Only adapters may import `bpy`.
-* **IR** stores operations, sockets, connections, types, and provenance.
-* **Translators** map semantic operations to backend fragments via a registry.
-* **Backends** generate native graphs. Only backends may import `hou` or Unreal Python.
+* **IR** names operations such as `points.distribute`, not `GeometryNodeDistributePointsOnFaces`.
+* **Frontends** map native constructs onto those operations and store host types as provenance.
+* **Backends** lower operations to native fragments. One IR node may become several target nodes.
+* **Fidelity** is always classified. Approximations and gaps are diagnostics, not silent substitutions.
 
-See [docs/architecture.md](docs/architecture.md) and
-[docs/intermediate_representation.md](docs/intermediate_representation.md).
+See [docs/architecture.md](docs/architecture.md) and [docs/translation_pipeline.md](docs/translation_pipeline.md).
 
-## Example workflow (target state)
+## Example workflow
 
-1. Author a Geometry Nodes tree in Blender.
-2. Extract it to `graph.nodebridge.json`.
-3. Analyse compatibility for Houdini.
-4. Generate a Houdini Python script.
-5. Run the script inside Houdini to rebuild an editable SOP network.
-6. Read the translation report for anything that was not exact.
+1. Author a Geometry Nodes scattering tree in Blender (or describe it as a native fixture).
+2. Extract it to NodeBridge IR (`points.distribute` → `random.vector` → `geometry.instance` → `geometry.realize_instances`).
+3. Plan translation toward Houdini.
+4. Generate a SOP construction plan (Scatter, Attribute Randomize, Copy to Points, Unpack).
+5. Optionally emit a `hou` script to rebuild an editable network inside Houdini.
+6. Read the translation report for anything that was lowered, approximated, implemented as VEX, or unsupported.
 
-Today, steps 2–4 can be exercised with hand-built IR fixtures.
+The inverse path (Houdini SOP fixture → IR → Blender Geometry Nodes plan) is implemented for the same subset.
 
-## Compatibility
-
-See [docs/compatibility.md](docs/compatibility.md). Coverage is intentionally
-narrow. The catalog starts with a small set of semantic operations so the IR
-can stay coherent.
+The graphs do not need identical topology. The goal is **procedural semantic equivalence** within documented fidelity, not node-name or wiring identity.
 
 ## Limitations
 
-* No Blender extraction yet
-* No Houdini or Unreal code generation yet
-* Operation catalog is a seed, not a complete Geometry Nodes coverage list
-* Rewrite passes exist as a pipeline only (identity / test doubles)
-* Nested groups are represented, but group semantics are not yet lowered
-* Field evaluation differences between applications are recorded, not solved
+* The operation catalog is a coherent seed, not Geometry Nodes / SOP / PCG coverage.
+* Live DCC execution is optional and environment-dependent. CI tests use host-neutral fixtures.
+* Unreal PCG Python is experimental (UE 5.7+ `add_node_of_type` / `add_edge`). Pin inspection is incomplete. NodeBridge emits plans and documented script text; it does not pretend unsupported editor APIs exist.
+* Nested groups are represented but not fully lowered.
+* Field-evaluation differences between applications are recorded, not solved.
+* Baking is a classified fallback, not an implemented evaluator.
+* The Blender add-on is a UI shell only.
 
 ## Roadmap
 
-The full milestone plan is in [docs/roadmap.md](docs/roadmap.md).
-
-1. Core IR — **this release**
-2. Blender Geometry Nodes extraction (small subset)
-3. Houdini SOP prototype
-4. Translation diagnostics
-5. More Geometry Nodes
-6. Blender add-on
-7. Unreal prototype
-8. Advanced semantic translation
+See [docs/roadmap.md](docs/roadmap.md). Next highest-leverage work: run the Blender ↔ Houdini slice against real `bpy` / `hou` sessions for the scattering subset.
 
 ## Tests
 

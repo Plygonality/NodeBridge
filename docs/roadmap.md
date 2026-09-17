@@ -1,84 +1,68 @@
 # Roadmap
 
-Do not attempt to support every Blender node immediately. Build
-vertically: a complete path for a small semantic subset, then widen.
+Do not attempt every node in every DCC. Build vertically: a complete
+path for a small semantic subset, then widen.
 
-## Milestone 1 — Core IR (current)
+This roadmap is reconciled with the repository. Milestone 1 (core IR)
+shipped in 0.1. Version 0.2 implements the many-to-many compiler
+architecture and a Blender ↔ Houdini construction-plan slice — work that
+spans several of the originally numbered milestones.
 
-* Graph / node / socket / connection model
-* IDs and type system
-* Validation
-* Versioned JSON
-* Diagnostics
-* Package skeleton, CLI, docs, tests
+## Completed
 
-No Houdini or Unreal generation.
+### Milestone 1 — Semantic compiler core (0.1, evolved in 0.2)
 
-## Milestone 2 — Blender Geometry Nodes extraction
+IR, types, validation, JSON, diagnostics, operation catalog, package
+skeleton.
 
-Support a small subset through `bpy`:
+### Milestone 2–7 (architecture + vertical slice in 0.2)
 
-* Math
-* Vector Math
-* Transform Geometry
-* Join Geometry
-* Set Position
+* Host plugin contract with frontend **and** backend per host
+* Capability model and translation planner
+* Blender Geometry Nodes frontend + backend (fixtures / construction plans)
+* Houdini SOP frontend + backend (fixtures / construction plans / VEX)
+* Bidirectional Blender ↔ Houdini slice for scattering + transforms
+* Unreal PCG frontend + backend contracts, fixtures, experimental scripts
+* Structured fidelity reports (`EXACT` … `UNSUPPORTED`)
+* CLI: inspect, validate, capabilities, plan, report, translate
 
-Verify extraction against IR fixtures.
+Live DCC execution is still optional and not CI-covered.
 
-## Milestone 3 — Houdini prototype
+## Next
 
-Translate the supported subset into Houdini Python.
+### Milestone 8 — Real Blender ↔ Houdini runtime slice
 
-```
-Blender Geometry Nodes → IR → generated hou script → native SOP network
-```
+Run the scattering subset against actual `bpy` and `hou` sessions.
+Verify editable Graphs in both applications. This is the highest-leverage
+next step for real-world usefulness.
 
-This is the first end-to-end proof of concept.
+### Milestone 9 — Unreal PCG editor integration
 
-## Milestone 4 — Translation diagnostics
+Where the experimental Python API permits: create a PCG graph asset,
+add Surface Sampler / Transform Points / Static Mesh Spawner, wire pins
+with verified labels. Keep fixture tests as the CI path.
 
-Compatibility scoring and human-readable reports, already sketched by
-`TranslationReport` in Milestone 1.
+### Milestone 10 — Expanded semantic operation catalog
 
-## Milestone 5 — More Geometry Nodes
+Incrementally: more primitives, curves, attributes, selections, noise,
+deletes, joins. Each operation needs frontend + backend + tests + a
+fidelity label.
 
-Incrementally:
+### Milestone 11 — Round-trip metadata
 
-* Mesh primitives
-* Curve operations
-* Instance on Points
-* Realize Instances
-* Noise
-* Attributes
-* Selections
-* Raycast
-* Geometry proximity
+Richer provenance, translation history on generated nodes, and tools to
+diff two IR graphs semantically after an artist edit in the target DCC.
+Perfect equivalence is still not the goal.
 
-## Milestone 6 — Blender add-on
+### Milestone 12 — Additional DCC host SDK
 
-Sidebar panel: select tree, choose target, analyse, export IR, generate
-code, copy, save. UI stays out of the translator.
-
-## Milestone 7 — Unreal prototype
-
-Narrow domain, whichever Unreal Python API is more reliable:
-
-* Shader Nodes → Material graph, or
-* Geometry Nodes → PCG
-
-## Milestone 8 — Advanced semantic translation
-
-* Compound mappings
-* Optimization / rewrite passes
-* Target capability analysis
-* Alternative implementations
-* Reusable translation recipes
+Maya/Bifrost, Substance Designer, or Nuke as a fourth host implemented
+only through the host contract.
 
 ## Explicitly later
 
 * Live localhost / IPC bridge
-* Round-trip editing
-* Maya, Substance, Unity, Godot, USD, MaterialX adapters
 * Simulation and repeat zones
 * Full shader / compositor coverage
+* Baking evaluators
+* USD / MaterialX interchange
