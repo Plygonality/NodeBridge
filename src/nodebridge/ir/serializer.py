@@ -12,7 +12,7 @@ from typing import Any, TextIO
 
 from nodebridge.core.graph import GraphInterface, GraphSystem, IRGraph
 from nodebridge.core.link import IRConnection
-from nodebridge.core.metadata import Metadata, Provenance, SourceMapping, UIHints
+from nodebridge.core.metadata import Metadata, Provenance, SourceMapping, TranslationEvent, UIHints
 from nodebridge.core.node import IRNode, IRParameter
 from nodebridge.core.socket import IRSocket
 from nodebridge.core.types import TypeRef
@@ -148,16 +148,19 @@ def _interface_to_dict(interface: GraphInterface) -> dict[str, Any]:
 
 
 def _metadata_to_dict(metadata: Metadata) -> dict[str, Any]:
-    return {
+    payload = {
         "provenance": _provenance_to_dict(metadata.provenance),
         "ui": _ui_to_dict(metadata.ui),
         "mapping": _mapping_to_dict(metadata.mapping),
         "extra": dict(metadata.extra),
     }
+    if metadata.history:
+        payload["history"] = [event.as_dict() for event in metadata.history]
+    return payload
 
 
 def _provenance_to_dict(provenance: Provenance) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "application": provenance.application,
         "application_version": provenance.application_version,
         "graph_system": provenance.graph_system,
@@ -167,6 +170,9 @@ def _provenance_to_dict(provenance: Provenance) -> dict[str, Any]:
         "original_id": provenance.original_id,
         "extra": dict(provenance.extra),
     }
+    if provenance.extracted_at:
+        payload["extracted_at"] = provenance.extracted_at
+    return payload
 
 
 def _ui_to_dict(ui: UIHints) -> dict[str, Any]:

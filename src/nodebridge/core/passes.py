@@ -1,7 +1,7 @@
 """Rewrite-pass protocol.
 
-Passes transform an IR graph into another IR graph. Milestone 1 only
-defines the pipeline; concrete optimizations land in later milestones.
+Passes transform an IR graph into another IR graph. Concrete compiler
+passes live in ``nodebridge.compiler.normalization``.
 """
 
 from __future__ import annotations
@@ -34,13 +34,7 @@ class IdentityPass:
 
 @dataclass
 class PassPipeline:
-    """Ordered sequence of rewrite passes.
-
-    Future work can insert constant folding, dead-node elimination, type
-    normalization, implicit conversion insertion, operation fusion,
-    unsupported-operation lowering, and target-specific optimization
-    without changing backend or adapter APIs.
-    """
+    """Ordered sequence of rewrite passes."""
 
     passes: list[RewritePass] = field(default_factory=list)
 

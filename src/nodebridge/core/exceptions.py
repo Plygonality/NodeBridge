@@ -24,12 +24,24 @@ class UnknownOperationError(NodeBridgeError):
 
 
 class AdapterError(NodeBridgeError):
-    """Raised by a source adapter. Adapters are not implemented in Milestone 1."""
+    """Raised by a source frontend / adapter."""
+
+
+class FrontendError(AdapterError):
+    """Raised when a host frontend cannot extract a native graph."""
 
 
 class BackendError(NodeBridgeError):
-    """Raised by a target backend. Backends are not implemented in Milestone 1."""
+    """Raised by a target backend."""
+
+
+class HostError(NodeBridgeError):
+    """Raised when a host plugin is missing, duplicated, or misconfigured."""
 
 
 class TranslationError(NodeBridgeError):
     """Raised when semantic translation cannot produce a usable result."""
+
+
+class PlanningError(TranslationError):
+    """Raised when a translation plan cannot be constructed."""

@@ -32,13 +32,32 @@ def normalize_value(value: Any) -> JSONValue:
 def value_matches_type(value: JSONValue, type_ref: TypeRef) -> bool:
     """Return True if *value* is a plausible constant for *type_ref*.
 
-    ``None`` is always accepted (meaning "no default"). ``UNKNOWN`` and
-    custom types accept any JSON value.
+    ``None`` is always accepted (meaning "no default"). ``UNKNOWN``,
+    ``OPAQUE``, ``FIELD``, ``ATTRIBUTE``, and custom types accept any JSON
+    value.
     """
     if value is None:
         return True
     builtin = type_ref.builtin
-    if builtin is None or builtin is DataType.UNKNOWN:
+    if builtin is None or builtin in {
+        DataType.UNKNOWN,
+        DataType.OPAQUE,
+        DataType.FIELD,
+        DataType.ATTRIBUTE,
+        DataType.OBJECT,
+        DataType.COLLECTION,
+        DataType.GEOMETRY,
+        DataType.MESH,
+        DataType.CURVE,
+        DataType.POINT_CLOUD,
+        DataType.POINTS,
+        DataType.INSTANCE,
+        DataType.INSTANCES,
+        DataType.MATERIAL,
+        DataType.TEXTURE,
+        DataType.IMAGE,
+        DataType.SHADER,
+    }:
         return True
     if builtin is DataType.BOOLEAN:
         return isinstance(value, bool)
@@ -48,7 +67,12 @@ def value_matches_type(value: JSONValue, type_ref: TypeRef) -> bool:
         return isinstance(value, (int, float)) and not isinstance(value, bool)
     if builtin is DataType.STRING:
         return isinstance(value, str)
-    if builtin in {DataType.VECTOR2, DataType.VECTOR3, DataType.VECTOR4, DataType.COLOR}:
+    if builtin in {
+        DataType.VECTOR2,
+        DataType.VECTOR3,
+        DataType.VECTOR4,
+        DataType.COLOR,
+    }:
         expected = {
             DataType.VECTOR2: 2,
             DataType.VECTOR3: 3,
@@ -60,7 +84,7 @@ def value_matches_type(value: JSONValue, type_ref: TypeRef) -> bool:
         if isinstance(expected, tuple):
             return len(value) in expected and all(_is_number(v) for v in value)
         return len(value) == expected and all(_is_number(v) for v in value)
-    if builtin is DataType.MATRIX:
+    if builtin in {DataType.MATRIX, DataType.TRANSFORM}:
         return isinstance(value, list)
     return True
 

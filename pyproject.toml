@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nodebridge"
-version = "0.1.0"
-description = "Cross-DCC procedural graph translation framework"
+version = "0.2.0"
+description = "Cross-DCC compiler for procedural graphs"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -14,8 +14,10 @@ keywords = [
     "blender",
     "houdini",
     "unreal",
+    "pcg",
     "procedural",
     "geometry-nodes",
+    "compiler",
     "intermediate-representation",
 ]
 classifiers = [
