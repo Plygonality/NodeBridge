@@ -6,8 +6,10 @@ from nodebridge.translators.registry import (
     TranslationHandler,
     TranslationRegistry,
     register_translation,
+    translate_node,
 )
 from nodebridge.translators.rules import RuleKind, TranslationRule
+from nodebridge.translators.semantic import translate_graph
 
 __all__ = [
     "DEFAULT_TRANSLATION_REGISTRY",
@@ -17,4 +19,6 @@ __all__ = [
     "TranslationRule",
     "analyse_compatibility",
     "register_translation",
+    "translate_graph",
+    "translate_node",
 ]

@@ -1,19 +1,23 @@
-"""Compatibility analysis (Milestone 4).
+"""Compatibility analysis.
 
-Walk an IR graph and classify every operation against a target without
-generating code. Milestone 1 exposes the report types so later work can
-fill them in.
+When a translation registry is supplied, classify from registered handlers.
+Otherwise consult the target host plugin via the compiler planner so
+unregistered operations cannot silently succeed.
 """
 
 from __future__ import annotations
 
+from nodebridge.compiler.planning import plan_translation
 from nodebridge.core.diagnostics import (
+    Diagnostic,
+    DiagnosticSeverity,
     OperationOutcome,
     TranslationReport,
     TranslationStatus,
 )
 from nodebridge.core.graph import IRGraph
 from nodebridge.core.operations import DEFAULT_OPERATION_REGISTRY, OperationRegistry
+from nodebridge.hosts.registry import DEFAULT_HOST_REGISTRY
 from nodebridge.translators.registry import TranslationRegistry
 
 
@@ -24,12 +28,20 @@ def analyse_compatibility(
     translations: TranslationRegistry | None = None,
     operations: OperationRegistry | None = None,
 ) -> TranslationReport:
-    """Produce a structured compatibility report for *graph* → *target*.
+    """Produce a structured compatibility report for *graph* → *target*."""
+    if translations is not None:
+        return _analyse_from_registry(graph, target, translations, operations)
+    if DEFAULT_HOST_REGISTRY.contains(target):
+        return plan_translation(graph, target, operations=operations).to_report(graph)
+    return _analyse_from_registry(graph, target, translations, operations)
 
-    Without registered translations every known operation is marked
-    ``UNSUPPORTED`` so the result cannot be mistaken for a silent success.
-    """
-    catalog = translations
+
+def _analyse_from_registry(
+    graph: IRGraph,
+    target: str,
+    catalog: TranslationRegistry | None,
+    operations: OperationRegistry | None,
+) -> TranslationReport:
     ops = operations or DEFAULT_OPERATION_REGISTRY
     report = TranslationReport(
         source_application=graph.provenance.application or "unknown",
@@ -55,8 +67,6 @@ def analyse_compatibility(
             )
         )
         if not ops.contains(node.operation):
-            from nodebridge.core.diagnostics import Diagnostic, DiagnosticSeverity
-
             report.add_diagnostic(
                 Diagnostic(
                     code="NB-W002",
@@ -67,9 +77,7 @@ def analyse_compatibility(
                 )
             )
     for child in graph.graphs.values():
-        child_report = analyse_compatibility(
-            child, target, translations=catalog, operations=ops
-        )
+        child_report = _analyse_from_registry(child, target, catalog, ops)
         report.outcomes.extend(child_report.outcomes)
         report.diagnostics.extend(child_report.diagnostics)
         report.nodes_analysed = len(report.outcomes)

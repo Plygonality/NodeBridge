@@ -1,5 +1,9 @@
-"""Houdini realization notes (Milestone 3).
+"""Houdini realization notes.
 
-This is not a Blender-to-Houdini node-name table. Recipes will describe
-how an IR operation is implemented as SOPs, wrangles, or VEX.
+Recipes live in ``nodebridge.hosts.houdini.mappings``. This module is kept
+as a stable import path.
 """
+
+from nodebridge.hosts.houdini.mappings import HOUDINI_RECIPES
+
+__all__ = ["HOUDINI_RECIPES"]

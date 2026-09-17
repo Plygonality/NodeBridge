@@ -1,8 +1,5 @@
-"""Structured Houdini Python script emitter (Milestone 3)."""
+"""Structured Houdini Python script emitter."""
 
-from nodebridge.core.exceptions import BackendError
+from nodebridge.hosts.houdini.backend import emit_houdini_script
 
-
-def emit_houdini_script(graph: object) -> str:
-    """Reserved for readable, deterministic ``hou`` script generation."""
-    raise BackendError("Houdini script generation is not implemented yet.")
+__all__ = ["emit_houdini_script"]

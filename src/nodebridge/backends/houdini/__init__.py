@@ -1,7 +1,4 @@
-"""Houdini backend package.
-
-``hou`` must only be imported from this package. Generation is Milestone 3.
-"""
+"""Houdini backend package. ``hou`` is imported only from hosts.houdini.runtime."""
 
 from nodebridge.backends.houdini.backend import HoudiniBackend
 

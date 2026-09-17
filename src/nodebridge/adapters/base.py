@@ -30,7 +30,7 @@ class UnimplementedAdapter:
 
     def extract(self, source: Any) -> IRDocument:
         raise AdapterError(
-            f"{self.__class__.__name__} is not implemented in Milestone 1"
+            f"{self.__class__.__name__} is not implemented. Use a concrete host frontend."
         )
 
 

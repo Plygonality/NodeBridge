@@ -1,8 +1,10 @@
-"""Shader node extraction helpers (later milestone)."""
+"""Shader Nodes mapping notes.
 
-from nodebridge.core.exceptions import AdapterError
+Shader translation is not part of the Geometry Nodes vertical slice.
+``ShaderNodeMath`` and ``ShaderNodeVectorMath`` are used *inside* Geometry
+Nodes and are handled by the Blender host mappings.
+"""
 
+from nodebridge.hosts.blender.mappings import MATH_OPERATIONS, VECTOR_OPERATIONS
 
-def extract_shader_nodes(node_tree: object) -> None:
-    """Reserved for shader-graph extraction."""
-    raise AdapterError("Shader node extraction is not implemented yet.")
+__all__ = ["MATH_OPERATIONS", "VECTOR_OPERATIONS"]

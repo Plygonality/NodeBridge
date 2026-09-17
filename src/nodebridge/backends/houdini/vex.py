@@ -1,8 +1,5 @@
-"""VEX snippet generation helpers (Milestone 3)."""
+"""VEX snippet generation helpers."""
 
-from nodebridge.core.exceptions import BackendError
+from nodebridge.hosts.houdini.vex import vex_for_math, vex_for_modify_position, vex_for_vector
 
-
-def emit_wrangle(source: str) -> None:
-    """Reserved for Attribute Wrangle / VEX emission."""
-    raise BackendError("VEX generation is not implemented yet.")
+__all__ = ["vex_for_math", "vex_for_modify_position", "vex_for_vector"]
