@@ -4,6 +4,10 @@ Builtin types are listed in :class:`DataType`. Additional types may be
 registered at runtime through :class:`TypeRegistry` without changing the
 core enum. Sockets and parameters store a :class:`TypeRef`, never a
 source-application type name.
+
+The catalog is host-independent. Distinctions that exist in only one DCC
+are not forced into the IR; distinctions required for semantic correctness
+are preserved.
 """
 
 from __future__ import annotations
@@ -23,24 +27,32 @@ class DataType(str, Enum):
     ``GEOMETRY`` and remain compatible with it.
     """
 
-    FLOAT = "float"
-    INTEGER = "integer"
     BOOLEAN = "boolean"
+    INTEGER = "integer"
+    FLOAT = "float"
     VECTOR2 = "vector2"
     VECTOR3 = "vector3"
     VECTOR4 = "vector4"
     COLOR = "color"
     STRING = "string"
     MATRIX = "matrix"
+    TRANSFORM = "transform"
     GEOMETRY = "geometry"
     MESH = "mesh"
     CURVE = "curve"
     POINT_CLOUD = "point_cloud"
+    POINTS = "points"
     INSTANCE = "instance"
+    INSTANCES = "instances"
     MATERIAL = "material"
     TEXTURE = "texture"
     IMAGE = "image"
     SHADER = "shader"
+    ATTRIBUTE = "attribute"
+    FIELD = "field"
+    OBJECT = "object"
+    COLLECTION = "collection"
+    OPAQUE = "opaque"
     UNKNOWN = "unknown"
 
     @classmethod
@@ -67,9 +79,14 @@ _GEOMETRY_SUBTYPES = frozenset(
         DataType.MESH,
         DataType.CURVE,
         DataType.POINT_CLOUD,
+        DataType.POINTS,
         DataType.INSTANCE,
+        DataType.INSTANCES,
     }
 )
+
+_POINT_TYPES = frozenset({DataType.POINT_CLOUD, DataType.POINTS})
+_INSTANCE_TYPES = frozenset({DataType.INSTANCE, DataType.INSTANCES})
 
 # Implicit numeric / vector conversions that a later rewrite pass may insert.
 _CONVERTIBLE_PAIRS = frozenset(
@@ -88,6 +105,16 @@ _CONVERTIBLE_PAIRS = frozenset(
         (DataType.VECTOR4, DataType.VECTOR3),
         (DataType.VECTOR2, DataType.VECTOR3),
         (DataType.VECTOR3, DataType.VECTOR2),
+        (DataType.MATRIX, DataType.TRANSFORM),
+        (DataType.TRANSFORM, DataType.MATRIX),
+        (DataType.FIELD, DataType.FLOAT),
+        (DataType.FLOAT, DataType.FIELD),
+        (DataType.ATTRIBUTE, DataType.FLOAT),
+        (DataType.FLOAT, DataType.ATTRIBUTE),
+        (DataType.FIELD, DataType.VECTOR3),
+        (DataType.VECTOR3, DataType.FIELD),
+        (DataType.ATTRIBUTE, DataType.VECTOR3),
+        (DataType.VECTOR3, DataType.ATTRIBUTE),
     }
 )
 
@@ -125,6 +152,10 @@ class TypeRef:
     def is_unknown(self) -> bool:
         return self.builtin is DataType.UNKNOWN or self.builtin is None
 
+    @property
+    def is_opaque(self) -> bool:
+        return self.builtin is DataType.OPAQUE
+
     def __str__(self) -> str:
         return self.name
 
@@ -140,8 +171,18 @@ def compare_types(source: TypeRef, target: TypeRef) -> TypeCompatibility:
     if src is DataType.UNKNOWN or dst is DataType.UNKNOWN:
         return TypeCompatibility.CONVERTIBLE
 
+    if src is DataType.OPAQUE or dst is DataType.OPAQUE:
+        if src is DataType.OPAQUE and dst is DataType.OPAQUE:
+            return TypeCompatibility.EQUIVALENT
+        return TypeCompatibility.CONVERTIBLE
+
     if src is None or dst is None:
         return TypeCompatibility.INCOMPATIBLE
+
+    if src in _POINT_TYPES and dst in _POINT_TYPES:
+        return TypeCompatibility.EQUIVALENT
+    if src in _INSTANCE_TYPES and dst in _INSTANCE_TYPES:
+        return TypeCompatibility.EQUIVALENT
 
     if src is DataType.GEOMETRY and dst in _GEOMETRY_SUBTYPES:
         return TypeCompatibility.EQUIVALENT
@@ -180,8 +221,8 @@ class TypeRegistry:
     def resolve(self, name: str | DataType | TypeRef) -> TypeRef:
         """Resolve *name* to a :class:`TypeRef`.
 
-        Unknown names become ``UNKNOWN`` builtins with the original name
-        preserved so they survive round-trips and diagnostics.
+        Unknown names become custom refs with the original name preserved
+        so they survive round-trips and diagnostics.
         """
         if isinstance(name, TypeRef):
             return name

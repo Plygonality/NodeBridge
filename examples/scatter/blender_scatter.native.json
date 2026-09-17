@@ -1,0 +1,201 @@
+{
+  "host": "blender",
+  "interface_inputs": [],
+  "interface_outputs": [],
+  "links": [
+    {
+      "source_node": "group_input",
+      "source_socket": "Geometry",
+      "target_node": "distribute",
+      "target_socket": "Mesh"
+    },
+    {
+      "source_node": "distribute",
+      "source_socket": "Points",
+      "target_node": "instance",
+      "target_socket": "Points"
+    },
+    {
+      "source_node": "cube",
+      "source_socket": "Mesh",
+      "target_node": "instance",
+      "target_socket": "Instance"
+    },
+    {
+      "source_node": "random",
+      "source_socket": "Value",
+      "target_node": "instance",
+      "target_socket": "Scale"
+    },
+    {
+      "source_node": "instance",
+      "source_socket": "Instances",
+      "target_node": "realize",
+      "target_socket": "Geometry"
+    },
+    {
+      "source_node": "realize",
+      "source_socket": "Geometry",
+      "target_node": "group_output",
+      "target_socket": "Geometry"
+    }
+  ],
+  "metadata": {},
+  "name": "scatter",
+  "nodes": [
+    {
+      "id": "group_input",
+      "inputs": [],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "geometry",
+          "name": "Geometry"
+        }
+      ],
+      "parameters": {},
+      "type": "NodeGroupInput"
+    },
+    {
+      "id": "distribute",
+      "inputs": [
+        {
+          "data_type": "geometry",
+          "name": "Mesh"
+        },
+        {
+          "data_type": "float",
+          "default": 10.0,
+          "name": "Density"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "points",
+          "name": "Points"
+        }
+      ],
+      "parameters": {
+        "density": 10.0,
+        "seed": 0
+      },
+      "type": "GeometryNodeDistributePointsOnFaces"
+    },
+    {
+      "id": "random",
+      "inputs": [
+        {
+          "data_type": "vector3",
+          "default": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "name": "Min"
+        },
+        {
+          "data_type": "vector3",
+          "default": [
+            1.5,
+            1.5,
+            1.5
+          ],
+          "name": "Max"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "vector3",
+          "name": "Value"
+        }
+      ],
+      "parameters": {
+        "data_type": "FLOAT_VECTOR",
+        "seed": 1
+      },
+      "type": "FunctionNodeRandomValue"
+    },
+    {
+      "id": "cube",
+      "inputs": [],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "geometry",
+          "name": "Mesh"
+        }
+      ],
+      "parameters": {
+        "size": 1.0
+      },
+      "type": "GeometryNodeMeshCube"
+    },
+    {
+      "id": "instance",
+      "inputs": [
+        {
+          "data_type": "points",
+          "name": "Points"
+        },
+        {
+          "data_type": "geometry",
+          "name": "Instance"
+        },
+        {
+          "data_type": "vector3",
+          "name": "Scale"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "instances",
+          "name": "Instances"
+        }
+      ],
+      "parameters": {},
+      "type": "GeometryNodeInstanceOnPoints"
+    },
+    {
+      "id": "realize",
+      "inputs": [
+        {
+          "data_type": "geometry",
+          "name": "Geometry"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "geometry",
+          "name": "Geometry"
+        }
+      ],
+      "parameters": {},
+      "type": "GeometryNodeRealizeInstances"
+    },
+    {
+      "id": "group_output",
+      "inputs": [
+        {
+          "data_type": "geometry",
+          "name": "Geometry"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [],
+      "parameters": {},
+      "type": "NodeGroupOutput"
+    }
+  ],
+  "system": "geometry_nodes"
+}

@@ -1,12 +1,12 @@
 """Semantic translation entry points.
 
-Milestone 1 defines the pipeline shape. Concrete lowering lives in later
-milestones so adapters and backends stay decoupled.
+``translate_graph`` now compiles through the host-plugin pipeline instead
+of raising a Milestone 1 stub error.
 """
 
 from __future__ import annotations
 
-from nodebridge.core.exceptions import TranslationError
+from nodebridge.compiler.pipeline import CompilationResult, compile_graph
 from nodebridge.core.graph import IRGraph
 from nodebridge.core.passes import PassPipeline
 from nodebridge.translators.registry import TranslationRegistry
@@ -18,16 +18,12 @@ def translate_graph(
     *,
     registry: TranslationRegistry | None = None,
     pipeline: PassPipeline | None = None,
-) -> None:
-    """Translate *graph* toward *target*.
+    generate: bool = False,
+) -> CompilationResult:
+    """Translate *graph* toward *target* using the semantic compiler.
 
-    Intended flow::
-
-        raw IR → optional rewrite pipeline → per-node registry dispatch
-        → backend graph fragments → generated host script
+    *registry* and *pipeline* are retained for call-site compatibility.
+    Host mappings come from the host plugin, not from a pairwise table.
     """
-    _ = (graph, target, registry, pipeline)
-    raise TranslationError(
-        "Semantic translation is not implemented in Milestone 1. "
-        "Use inspect/validate on a serialized IR document."
-    )
+    _ = (registry, pipeline)
+    return compile_graph(graph, target, generate=generate)

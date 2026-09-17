@@ -1,7 +1,4 @@
-"""Unreal Engine backend package.
-
-Unreal Python imports must stay inside this package. Prototype is Milestone 7.
-"""
+"""Unreal Engine backend package."""
 
 from nodebridge.backends.unreal.backend import UnrealBackend
 

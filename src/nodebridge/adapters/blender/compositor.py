@@ -1,8 +1,8 @@
-"""Compositor extraction helpers (later milestone)."""
+"""Compositor extraction is not implemented."""
 
 from nodebridge.core.exceptions import AdapterError
 
 
 def extract_compositor(node_tree: object) -> None:
-    """Reserved for compositor-graph extraction."""
-    raise AdapterError("Compositor extraction is not implemented yet.")
+    """Reserved for a future compositor frontend."""
+    raise AdapterError("Compositor extraction is not implemented.")

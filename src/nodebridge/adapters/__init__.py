@@ -1,4 +1,7 @@
-"""Source adapters. Milestone 1 ships only the adapter contract."""
+"""Source adapters. Prefer ``nodebridge.hosts`` for new code.
+
+These modules re-export host frontends so existing imports keep working.
+"""
 
 from nodebridge.adapters.base import SourceAdapter, UnimplementedAdapter
 

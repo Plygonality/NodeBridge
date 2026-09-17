@@ -1,34 +1,25 @@
-"""Blender node-tree extractor (Milestone 2).
+"""Blender node-tree extractor.
 
-This module intentionally does not import ``bpy``. Doing so would make the
-core package require Blender at install time.
+The extractor is the Blender host frontend. ``bpy`` is never imported here.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from nodebridge.adapters.base import UnimplementedAdapter
-from nodebridge.core.exceptions import AdapterError
+from nodebridge.hosts.blender.frontend import BlenderFrontend
 from nodebridge.ir.schema import IRDocument
 
 
-class BlenderExtractor(UnimplementedAdapter):
-    """Inspect a Blender node tree through ``bpy`` and emit IR.
+class BlenderExtractor(BlenderFrontend):
+    """Inspect a Blender node tree and emit IR.
 
-    Planned coverage (Milestone 2, Geometry Nodes subset):
-
-    * ``math.*``
-    * ``vector.*``
-    * ``geometry.transform``
-    * ``geometry.join``
-    * ``geometry.modify_position``
+    Accepts a :class:`~nodebridge.hosts.native.NativeGraph` fixture, a JSON
+    dict, or a duck-typed bpy tree. Live bpy inspection lives in
+    ``nodebridge.hosts.blender.runtime``.
     """
 
     application = "blender"
 
     def extract(self, source: Any) -> IRDocument:
-        raise AdapterError(
-            "Blender extraction is Milestone 2. Pass a serialized IR document "
-            "to inspect or validate graphs in Milestone 1."
-        )
+        return super().extract(source)

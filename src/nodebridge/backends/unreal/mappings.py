@@ -1,6 +1,5 @@
-"""Unreal realization notes (Milestone 7).
+"""Unreal realization notes. Recipes live in hosts.unreal.mappings."""
 
-Capability selection happens before mapping. A shader operation should
-not be forced into PCG, and a geometry operation should not be forced
-into the Material Editor.
-"""
+from nodebridge.hosts.unreal.mappings import UNREAL_RECIPES
+
+__all__ = ["UNREAL_RECIPES"]

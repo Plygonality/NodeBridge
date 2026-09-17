@@ -1,8 +1,5 @@
-"""Structured Unreal Python script emitter (Milestone 7)."""
+"""Structured Unreal Python script emitter."""
 
-from nodebridge.core.exceptions import BackendError
+from nodebridge.hosts.unreal.backend import emit_unreal_script
 
-
-def emit_unreal_script(graph: object) -> str:
-    """Reserved for readable Unreal Python script generation."""
-    raise BackendError("Unreal script generation is not implemented yet.")
+__all__ = ["emit_unreal_script"]

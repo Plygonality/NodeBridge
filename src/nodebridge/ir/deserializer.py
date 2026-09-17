@@ -9,7 +9,7 @@ from typing import Any, TextIO
 from nodebridge.core.exceptions import SerializationError, VersionError
 from nodebridge.core.graph import GraphInterface, GraphSystem, IRGraph
 from nodebridge.core.link import IRConnection
-from nodebridge.core.metadata import Metadata, Provenance, SourceMapping, UIHints
+from nodebridge.core.metadata import Metadata, Provenance, SourceMapping, TranslationEvent, UIHints
 from nodebridge.core.node import IRNode, IRParameter
 from nodebridge.core.socket import FieldKind, GeometryDomain, IRSocket, SocketDirection
 from nodebridge.core.types import TypeRef
@@ -189,11 +189,17 @@ def _interface_from_dict(data: dict[str, Any]) -> GraphInterface:
 
 
 def _metadata_from_dict(data: dict[str, Any]) -> Metadata:
+    history = [
+        TranslationEvent.from_dict(item)
+        for item in data.get("history") or []
+        if isinstance(item, dict)
+    ]
     return Metadata(
         provenance=_provenance_from_dict(data.get("provenance") or {}),
         ui=_ui_from_dict(data.get("ui") or {}),
         mapping=_mapping_from_dict(data.get("mapping") or {}),
         extra=dict(data.get("extra") or {}),
+        history=history,
     )
 
 
@@ -206,6 +212,7 @@ def _provenance_from_dict(data: dict[str, Any]) -> Provenance:
         original_name=str(data.get("original_name") or ""),
         original_label=str(data.get("original_label") or ""),
         original_id=str(data.get("original_id") or ""),
+        extracted_at=str(data.get("extracted_at") or ""),
         extra=dict(data.get("extra") or {}),
     )
 

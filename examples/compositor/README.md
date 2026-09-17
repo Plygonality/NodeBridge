@@ -1,3 +1,4 @@
 # Compositor examples
 
-Compositor fixtures are reserved for a later extraction milestone.
+Compositor translation is not implemented. Geometry procedural graphs
+are the current vertical slice.

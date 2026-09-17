@@ -1,8 +1,14 @@
-"""Blender node-property capture helpers (Milestone 2)."""
+"""Blender node-property helpers."""
 
-from nodebridge.core.exceptions import AdapterError
+from typing import Any
 
 
-def capture_node_properties(node: object) -> None:
-    """Reserved for reading Blender node properties into IR parameters."""
-    raise AdapterError("Blender property capture is not implemented yet.")
+def blender_properties(node: Any) -> dict[str, Any]:
+    """Read JSON-safe properties from a duck-typed Blender node."""
+    values: dict[str, Any] = {}
+    for attr in ("operation", "data_type", "domain", "mode", "density", "seed"):
+        if hasattr(node, attr):
+            value = getattr(node, attr)
+            if value is None or isinstance(value, (bool, int, float, str, list, tuple, dict)):
+                values[attr] = value
+    return values

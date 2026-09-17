@@ -1,4 +1,9 @@
-"""Nested Blender node-group walking (Milestone 2)."""
+"""Nested Blender node-group walking.
+
+Group calls are represented in IR as ``graph.group`` with
+``nested_graph_id``. Recursive bpy walking is not implemented; fixtures
+may include nested NativeGraphs later.
+"""
 
 from nodebridge.core.exceptions import AdapterError
 

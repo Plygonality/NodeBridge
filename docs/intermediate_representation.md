@@ -8,11 +8,11 @@ It is not Blender Python, not Houdini Python, and not a bag of UI names.
 
 ```json
 {
-  "nodebridge_version": "0.1.0",
+  "nodebridge_version": "0.2.0",
   "ir_version": "1",
   "source": {
     "application": "blender",
-    "graph_system": "geometry"
+    "graph_system": "geometry_nodes"
   },
   "graph": {}
 }
@@ -24,20 +24,19 @@ It is not Blender Python, not Houdini Python, and not a bag of UI names.
 * `graph` — the root graph
 
 Unknown future IR versions are rejected unless a migration is registered.
+Additive optional fields (`extracted_at`, `history`) are omitted when empty
+so version `"1"` documents remain loadable.
 
 ## Core objects
 
 ### Graph
 
-A directed graph of operations. It contains:
+A directed graph of operations. It contains nodes, connections, nested
+graphs (reusable groups), an interface, and provenance.
 
-* nodes
-* connections
-* nested graphs (reusable groups)
-* an interface (exposed inputs/outputs)
-* provenance
-
-`GraphSystem` is `geometry`, `shader`, `compositor`, or `unknown`.
+`GraphSystem` is `geometry`, `shader`, `compositor`, or `unknown`. Host
+graph systems (`geometry_nodes`, `sop`, `pcg`) live on provenance, not
+as extra IR graph kinds.
 
 ### Node
 
@@ -55,105 +54,47 @@ IRNode(
 `operation` is a dotted semantic name. Source node types belong in
 `metadata.provenance.original_type`.
 
-A group call uses `operation="graph.group"` and `nested_graph_id`.
+### Socket, connection, parameter
 
-### Socket
-
-A typed port. Connections refer to socket **IDs**, not display names.
-
-Sockets also record:
-
-* `field_kind` — `value`, `field`, or `unknown`
-* `domain` — geometry domain when the value is a field
-* `default` — JSON-safe constant when unconnected
-
-### Connection
-
-```text
-IRConnection(
-    source_node="node_0010",
-    source_socket="geometry",
-    target_node="node_0024",
-    target_socket="geometry"
-)
-```
-
-Endpoints are explicit. There is no implicit "first socket" wiring.
-
-### Parameter
-
-A typed constant that is not a socket (math mode, flags, enum values).
+Connections refer to socket **IDs**. Sockets record `field_kind`,
+`domain`, and a JSON-safe `default`. Parameters are typed constants that
+are not sockets.
 
 ### Metadata
 
-Split into:
-
-* **provenance** — application, original type/name/id
+* **provenance** — application, version, original type/name/id, extraction time
 * **UI hints** — position, mute, frames, labels
 * **source mapping** — source → IR → target ids
-* **extra** — open-ended, JSON-safe bag
+* **history** — translation events (optional)
+* **extra** — open-ended JSON-safe bag
 
 ## Data types
 
 Builtin types:
 
-`float`, `integer`, `boolean`, `vector2`, `vector3`, `vector4`, `color`,
-`string`, `matrix`, `geometry`, `mesh`, `curve`, `point_cloud`,
-`instance`, `material`, `texture`, `image`, `shader`, `unknown`
+`boolean`, `integer`, `float`, `vector2`, `vector3`, `vector4`, `color`,
+`string`, `matrix`, `transform`, `geometry`, `mesh`, `curve`,
+`point_cloud`, `points`, `instance`, `instances`, `material`, `texture`,
+`image`, `shader`, `attribute`, `field`, `object`, `collection`,
+`opaque`, `unknown`
 
 Custom types use dotted names (`usd.token`) via `TypeRegistry`.
 
-Compatibility:
-
-| Relation | Example |
-| --- | --- |
-| Identical | `float` → `float` |
-| Equivalent | `mesh` → `geometry` |
-| Convertible | `float` → `integer`, `vector3` → `color` |
-| Incompatible | `shader` → `geometry` |
-
-Unknown types are treated as convertible so they survive extraction, but
-they produce diagnostics.
-
-## Operations
-
-Operations live in `OperationRegistry`. The seed catalog includes math,
-vector, a few geometry ops, attributes, procedural patterns, shaders,
-color, and graph interface ops.
-
-Unknown operations are allowed in the IR. Validation emits `NB-W002`
-rather than dropping the node. That is required for honest reporting.
+`opaque` exists for unavoidable host-specific values. It is not a way to
+smuggle executable code into the IR.
 
 ## Validation
 
-`validate_graph` returns structured diagnostics. Errors include missing
-endpoints, direction mismatches, duplicate IDs, and broken group
-references. Warnings include unknown operations, type mismatches, data-
-flow cycles, and multiple connections into one input.
-
-Validation never "fixes" the graph.
-
-## Translation quality
-
-Every translated operation should later carry one of:
-
-* `EXACT`
-* `EQUIVALENT`
-* `APPROXIMATED`
-* `PARTIAL`
-* `UNSUPPORTED`
-
-Milestone 1 implements the report objects. Compatibility analysis marks
-unregistered operations as `UNSUPPORTED` so silence is impossible.
+`validate_graph` returns structured diagnostics. It never "fixes" the
+graph. Unknown operations are warnings (`NB-W002`), not silent drops.
 
 ## Identifiers
 
-IDs are opaque strings (`node_0001`, or a caller-supplied source id).
-`IdFactory` mints deterministic sequential IDs for tests and generators.
+IDs are opaque strings. `IdFactory` mints deterministic sequential IDs.
 Round-trips preserve IDs exactly.
 
 ## Versioning
 
 `ir_version` is a separate axis from the package version. A
-`MigrationRegistry` can walk old documents forward. Milestone 1 supports
-only version `"1"` and ships no automatic migrations.
+`MigrationRegistry` can walk old documents forward. Currently only
+version `"1"` is supported.

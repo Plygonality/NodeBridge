@@ -1,0 +1,180 @@
+{
+  "host": "houdini",
+  "interface_inputs": [],
+  "interface_outputs": [],
+  "links": [
+    {
+      "source_node": "geo_in",
+      "source_socket": "output0",
+      "target_node": "scatter",
+      "target_socket": "input0"
+    },
+    {
+      "source_node": "scatter",
+      "source_socket": "output0",
+      "target_node": "pscale",
+      "target_socket": "input0"
+    },
+    {
+      "source_node": "box",
+      "source_socket": "output0",
+      "target_node": "copy",
+      "target_socket": "input0"
+    },
+    {
+      "source_node": "pscale",
+      "source_socket": "output0",
+      "target_node": "copy",
+      "target_socket": "input1"
+    },
+    {
+      "source_node": "copy",
+      "source_socket": "output0",
+      "target_node": "unpack",
+      "target_socket": "input0"
+    },
+    {
+      "source_node": "unpack",
+      "source_socket": "output0",
+      "target_node": "out",
+      "target_socket": "input0"
+    }
+  ],
+  "metadata": {},
+  "name": "scatter",
+  "nodes": [
+    {
+      "id": "geo_in",
+      "inputs": [],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "unknown",
+          "name": "output0"
+        }
+      ],
+      "parameters": {
+        "role": "input"
+      },
+      "type": "null"
+    },
+    {
+      "id": "scatter",
+      "inputs": [
+        {
+          "data_type": "unknown",
+          "name": "input0"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "unknown",
+          "name": "output0"
+        }
+      ],
+      "parameters": {
+        "npts": 100,
+        "seed": 0
+      },
+      "type": "scatter"
+    },
+    {
+      "id": "pscale",
+      "inputs": [
+        {
+          "data_type": "unknown",
+          "name": "input0"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "unknown",
+          "name": "output0"
+        }
+      ],
+      "parameters": {
+        "attrname": "pscale",
+        "type": "vector"
+      },
+      "type": "attribrandomize"
+    },
+    {
+      "id": "box",
+      "inputs": [],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "unknown",
+          "name": "output0"
+        }
+      ],
+      "parameters": {},
+      "type": "box"
+    },
+    {
+      "id": "copy",
+      "inputs": [
+        {
+          "data_type": "unknown",
+          "name": "input0"
+        },
+        {
+          "data_type": "unknown",
+          "name": "input1"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "unknown",
+          "name": "output0"
+        }
+      ],
+      "parameters": {},
+      "type": "copytopoints"
+    },
+    {
+      "id": "unpack",
+      "inputs": [
+        {
+          "data_type": "unknown",
+          "name": "input0"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [
+        {
+          "data_type": "unknown",
+          "name": "output0"
+        }
+      ],
+      "parameters": {},
+      "type": "unpack"
+    },
+    {
+      "id": "out",
+      "inputs": [
+        {
+          "data_type": "unknown",
+          "name": "input0"
+        }
+      ],
+      "metadata": {},
+      "name": "",
+      "outputs": [],
+      "parameters": {
+        "role": "output"
+      },
+      "type": "null"
+    }
+  ],
+  "system": "sop"
+}

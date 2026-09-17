@@ -1,13 +1,10 @@
-"""High-level export façade.
-
-Milestone 1 can write IR JSON. Target-script generation is later.
-"""
+"""High-level export façade."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from nodebridge.core.exceptions import BackendError
+from nodebridge.compiler.pipeline import compile_graph
 from nodebridge.core.graph import IRGraph
 from nodebridge.ir.schema import IRDocument
 from nodebridge.ir.serializer import dump
@@ -25,8 +22,9 @@ def export_target_script(
     target: str,
     destination: str | Path,
 ) -> Path:
-    """Generate a host script. Not implemented in Milestone 1."""
-    raise BackendError(
-        f"Target export for {target!r} is not implemented in Milestone 1. "
-        "Use export_ir() to write a .nodebridge.json document."
-    )
+    """Generate a host script. Explicit stage — never runs on IR load."""
+    graph = document.graph if isinstance(document, IRDocument) else document
+    result = compile_graph(graph, target, generate=True)
+    path = Path(destination)
+    path.write_text(result.generated_code, encoding="utf-8")
+    return path
