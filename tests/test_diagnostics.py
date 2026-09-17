@@ -15,7 +15,8 @@ def test_report_counts_and_text() -> None:
     report = TranslationReport(
         source_application="Blender",
         source_system="Geometry Nodes",
-        target="Houdini SOP",
+        target="Houdini",
+        target_system="SOP",
     )
     report.add_outcome(
         OperationOutcome("n1", "geometry.transform", TranslationStatus.EXACT)
@@ -23,16 +24,16 @@ def test_report_counts_and_text() -> None:
     report.add_outcome(
         OperationOutcome(
             "n2",
-            "geometry.modify_position",
-            TranslationStatus.EQUIVALENT,
-            source_type="GeometryNodeSetPosition",
+            "geometry.instance",
+            TranslationStatus.LOWERED,
+            source_type="GeometryNodeInstanceOnPoints",
         )
     )
     report.add_outcome(
         OperationOutcome(
             "n3",
             "procedural.noise",
-            TranslationStatus.APPROXIMATED,
+            TranslationStatus.APPROXIMATE,
             note="Mapped to Unified Noise",
             source_type="ShaderNodeTexNoise",
         )
@@ -45,6 +46,14 @@ def test_report_counts_and_text() -> None:
             source_type="GeometryNodeFooBar",
         )
     )
+    report.add_outcome(
+        OperationOutcome(
+            "n5",
+            "math.add",
+            TranslationStatus.CUSTOM_CODE,
+            note="Attribute Wrangle",
+        )
+    )
     report.add_diagnostic(
         Diagnostic(
             code="NB-W100",
@@ -55,11 +64,16 @@ def test_report_counts_and_text() -> None:
     counts = report.counts()
     assert counts[TranslationStatus.EXACT] == 1
     assert counts[TranslationStatus.UNSUPPORTED] == 1
+    assert counts[TranslationStatus.CUSTOM_CODE] == 1
     text = report.format_text()
-    assert "Nodes analysed: 4" in text
+    assert "5 total" in text
+    assert "EXACT" in text
     assert "GeometryNodeFooBar" in text
     assert "Unified Noise" in text
     assert "Blender-specific field behavior" in text
     payload = report.as_dict()
     assert payload["counts"]["exact"] == 1
+    assert "compatibility_percent" not in payload
     assert payload["diagnostics"][0]["code"] == "NB-W100"
+    assert TranslationStatus.EQUIVALENT is TranslationStatus.LOWERED
+    assert TranslationStatus.APPROXIMATED is TranslationStatus.APPROXIMATE

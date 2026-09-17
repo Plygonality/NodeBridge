@@ -46,14 +46,22 @@ def test_missing_translation_raises() -> None:
 
 def test_compatibility_marks_unregistered_as_unsupported() -> None:
     graph = make_transform_graph().graph
-    report = analyse_compatibility(graph, "houdini")
+    report = analyse_compatibility(graph, "missing-host")
     assert report.nodes_analysed == 4
     assert report.counts()[TranslationStatus.UNSUPPORTED] == 4
     text = report.format_text()
-    assert "Unsupported" in text
+    assert "UNSUPPORTED" in text
     assert "GeometryNodeTransform" in text
     operations = {outcome.operation for outcome in report.outcomes}
     assert "geometry.transform" in operations
+
+
+def test_compatibility_uses_host_plugin_by_default() -> None:
+    graph = make_transform_graph().graph
+    report = analyse_compatibility(graph, "houdini")
+    statuses = {outcome.operation: outcome.status for outcome in report.outcomes}
+    assert statuses["geometry.transform"] is TranslationStatus.EXACT
+    assert statuses["graph.input"] is TranslationStatus.EXACT
 
 
 def test_compatibility_uses_registered_status() -> None:
@@ -83,5 +91,5 @@ def test_compatibility_uses_registered_status() -> None:
     )
     statuses = {outcome.operation: outcome.status for outcome in report.outcomes}
     assert statuses["geometry.transform"] is TranslationStatus.EXACT
-    assert statuses["vector.add"] is TranslationStatus.EQUIVALENT
+    assert statuses["vector.add"] is TranslationStatus.LOWERED
     assert statuses["graph.input"] is TranslationStatus.UNSUPPORTED

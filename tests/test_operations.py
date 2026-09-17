@@ -16,6 +16,10 @@ def test_seed_operations_are_registered() -> None:
     assert DEFAULT_OPERATION_REGISTRY.contains("math.add")
     assert DEFAULT_OPERATION_REGISTRY.contains("geometry.transform")
     assert DEFAULT_OPERATION_REGISTRY.contains("geometry.modify_position")
+    assert DEFAULT_OPERATION_REGISTRY.contains("points.distribute")
+    assert DEFAULT_OPERATION_REGISTRY.contains("surface_sample")
+    assert DEFAULT_OPERATION_REGISTRY.contains("random.vector")
+    assert DEFAULT_OPERATION_REGISTRY.contains("math.clamp")
     assert not DEFAULT_OPERATION_REGISTRY.contains("geometry.foobar")
 
 

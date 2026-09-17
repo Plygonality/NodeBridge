@@ -34,13 +34,34 @@ def test_cli_report(tmp_path: Path, capsys: object) -> None:
     assert "NodeBridge Translation Report" in output
 
 
-def test_cli_translate_not_implemented(tmp_path: Path) -> None:
+def test_cli_translate_compiles(tmp_path: Path, capsys: object) -> None:
     path = tmp_path / "graph.nodebridge.json"
     dump(make_transform_graph().graph, path)
-    assert main(["translate", str(path), "--target", "houdini"]) == 2
+    assert main(["translate", str(path), "--target", "houdini"]) == 0
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "NodeBridge Translation Report" in output
+    assert "xform" in output or "Native nodes:" in output
+
+
+def test_cli_capabilities(capsys: object) -> None:
+    assert main(["capabilities"]) == 0
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "blender" in output
+    assert "houdini" in output
+    assert main(["capabilities", "unreal"]) == 0
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "pcg" in output
+
+
+def test_cli_plan(tmp_path: Path, capsys: object) -> None:
+    path = tmp_path / "graph.nodebridge.json"
+    dump(make_transform_graph().graph, path)
+    assert main(["plan", str(path), "--target", "houdini"]) == 0
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "geometry.transform" in output
 
 
 def test_cli_version(capsys: object) -> None:
     assert main(["--version"]) == 0
     output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "NodeBridge 0.1.0" in output
+    assert "NodeBridge 0.2.0" in output
