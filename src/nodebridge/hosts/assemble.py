@@ -48,6 +48,17 @@ def assemble_native(
         if fragment.fidelity is TranslationStatus.UNSUPPORTED and not fragment.nodes:
             fragment = unsupported_fragment(node)
         fragments[node_id] = fragment
+        source_name = (
+            node.metadata.ui.label
+            or node.metadata.provenance.original_label
+            or node.metadata.provenance.original_name
+        )
+        for item in fragment.nodes:
+            item.metadata.setdefault("fidelity", fragment.fidelity.value)
+            item.metadata.setdefault("note", fragment.note)
+            item.metadata.setdefault("operation", node.operation)
+            if source_name:
+                item.metadata.setdefault("source_name", source_name)
         native.nodes.extend(fragment.nodes)
         native.links.extend(fragment.links)
         source_type = node.metadata.provenance.original_type

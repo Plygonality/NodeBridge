@@ -70,9 +70,44 @@ STATIC_OPERATIONS = {
     "ShaderNodeTexNoise": "procedural.noise",
     "ShaderNodeTexVoronoi": "procedural.voronoi",
     "ShaderNodeMix": "color.mix",
+    "ShaderNodeMixRGB": "color.mix",
     "ShaderNodeValToRGB": "color.ramp",
     "ShaderNodeBsdfPrincipled": "shader.principled_surface",
     "ShaderNodeTexImage": "texture.sample",
+    "ShaderNodeOutputMaterial": "shader.output",
+    "ShaderNodeTexCoord": "shader.texcoord",
+    "ShaderNodeNormalMap": "shader.normal",
+    "ShaderNodeBump": "shader.normal",
+    "GeometryNodeRotateInstances": "geometry.rotate_instances",
+    "GeometryNodeScaleInstances": "geometry.scale_instances",
+    "GeometryNodeSetMaterial": "geometry.set_material",
+    "GeometryNodeExtrudeMesh": "geometry.extrude",
+    "GeometryNodeSubdivideMesh": "geometry.subdivide",
+    "GeometryNodeCurveToMesh": "geometry.curve_to_mesh",
+    "GeometryNodeResampleCurve": "geometry.resample_curve",
+    "GeometryNodeProximity": "geometry.proximity",
+    "GeometryNodeRaycast": "geometry.raycast",
+    "GeometryNodeSwitch": "geometry.switch",
+    "GeometryNodeInputPosition": "attribute.position",
+    "GeometryNodeInputNormal": "attribute.normal",
+    "GeometryNodeInputIndex": "attribute.index",
+    "GeometryNodeInputID": "attribute.id",
+    "NodeReroute": "graph.reroute",
+    "GeometryNodeGroup": "graph.group",
+    "ShaderNodeGroup": "graph.group",
+    "CompositorNodeGroup": "graph.group",
+    "CompositorNodeRLayers": "compositor.input",
+    "CompositorNodeImage": "compositor.input",
+    "CompositorNodeComposite": "compositor.output",
+    "CompositorNodeViewer": "compositor.output",
+    "CompositorNodeOutputFile": "compositor.output",
+    "CompositorNodeGlare": "compositor.glare",
+    "CompositorNodeColorBalance": "compositor.color_correct",
+    "CompositorNodeColorCorrection": "compositor.color_correct",
+    "CompositorNodeBlur": "compositor.blur",
+    "CompositorNodeMixRGB": "compositor.mix",
+    "CompositorNodeEllipseMask": "compositor.mask",
+    "CompositorNodeBoxMask": "compositor.mask",
 }
 
 PRIMITIVE_KINDS = {
@@ -84,6 +119,9 @@ PRIMITIVE_KINDS = {
     "GeometryNodeMeshCone": "cone",
     "GeometryNodeMeshCylinder": "cylinder",
     "GeometryNodeMeshLine": "line",
+    "GeometryNodeCurvePrimitiveCircle": "circle",
+    "GeometryNodeCurvePrimitiveLine": "line",
+    "GeometryNodeCurvePrimitiveQuadrilateral": "quadrilateral",
 }
 
 
@@ -101,14 +139,26 @@ def resolve_blender_node(node: NativeNode, graph: NativeGraph) -> tuple[str, dic
     if bl_type == "FunctionNodeRandomValue":
         data_type = str(node.parameters.get("data_type") or "FLOAT").upper()
         return RANDOM_TYPES.get(data_type, "random.float"), extras
+    if bl_type in {"FunctionNodeBooleanMath"}:
+        operation = str(node.parameters.get("operation") or "AND").lower()
+        extras["parameters"] = {"operation": operation}
+        return "math.boolean", extras
     if bl_type in PRIMITIVE_KINDS:
+        kind = PRIMITIVE_KINDS[bl_type]
+        if bl_type.startswith("GeometryNodeCurve"):
+            extras["parameters"] = {"primitive": kind}
+            return "geometry.curve_primitive", extras
         extras["parameters"] = {
-            "primitive": PRIMITIVE_KINDS[bl_type],
+            "primitive": kind,
             "size": node.parameters.get("size", 1.0),
         }
         return "geometry.primitive", extras
     if bl_type in STATIC_OPERATIONS:
-        return STATIC_OPERATIONS[bl_type], extras
+        operation = STATIC_OPERATIONS[bl_type]
+        nested = node.parameters.get("nested_graph_id")
+        if nested:
+            extras["nested_graph_id"] = nested
+        return operation, extras
     return "unknown", extras
 
 

@@ -414,3 +414,226 @@ PRIMITIVE_BACKEND_TYPES = {
     "cone": "tube",
     "line": "line",
 }
+
+
+def _vex_recipe(operation: str, snippet: str, *, note: str, output: str = "geometry") -> Recipe:
+    def builder(node: IRNode) -> dict[str, JSONValue]:
+        del node
+        return {"snippet": snippet, "class": "point"}
+
+    return Recipe(
+        operation=operation,
+        fidelity=TranslationStatus.CUSTOM_CODE,
+        nodes=(
+            NodeTemplate(
+                local_id="wrangle",
+                native_type="attribwrangle",
+                inputs=("input0",),
+                outputs=("output0",),
+            ),
+        ),
+        expose_inputs={"geometry": ("wrangle", "input0"), "vector": ("wrangle", "input0")},
+        expose_outputs={output: ("wrangle", "output0"), "geometry": ("wrangle", "output0")},
+        note=note,
+        code_kind="vex",
+        code=snippet,
+        parameter_builder=builder,
+    )
+
+
+HOUDINI_RECIPES["procedural.noise"] = _vex_recipe(
+    "procedural.noise",
+    "f@noise = noise(@P * chf('scale') + ch('seed'));\n",
+    note="Houdini noise() is not Blender's Noise Texture. The pattern will not match numerically.",
+    output="value",
+)
+HOUDINI_RECIPES["procedural.voronoi"] = _vex_recipe(
+    "procedural.voronoi",
+    "f@noise = noise(@P * chf('scale'), 1);\n",
+    note="Houdini has no Blender-identical Voronoi. This uses a cellular-style noise approximation.",
+    output="value",
+)
+HOUDINI_RECIPES["selection.compare"] = _vex_recipe(
+    "selection.compare",
+    "i@mask = f@value > chf('threshold');\n",
+    note="Comparison is implemented as a point wrangle.",
+    output="result",
+)
+HOUDINI_RECIPES["selection.spatial_noise"] = _vex_recipe(
+    "selection.spatial_noise",
+    "vector sample = v@P;\nf@noise = noise(sample * chf('scale') + ch('seed'));\ni@mask = f@noise > chf('threshold');\n",
+    note="Spatial noise mask uses Houdini noise(), which is not Blender's Noise Texture.",
+    output="result",
+)
+def _boolean_snippet(node: IRNode) -> str:
+    operation = str(_params(node).get("operation") or "and").lower()
+    snippets = {
+        "and": "i@value = i@a && i@b;",
+        "or": "i@value = i@a || i@b;",
+        "not": "i@value = !i@a;",
+        "xor": "i@value = i@a ^ i@b;",
+        "nand": "i@value = !(i@a && i@b);",
+        "nor": "i@value = !(i@a || i@b);",
+    }
+    return snippets.get(operation, snippets["and"]) + "\n"
+
+
+HOUDINI_RECIPES["math.boolean"] = Recipe(
+    operation="math.boolean",
+    fidelity=TranslationStatus.CUSTOM_CODE,
+    nodes=(
+        NodeTemplate(
+            local_id="wrangle",
+            native_type="attribwrangle",
+            inputs=("input0",),
+            outputs=("output0",),
+        ),
+    ),
+    expose_inputs={"a": ("wrangle", "input0"), "b": ("wrangle", "input0"), "geometry": ("wrangle", "input0")},
+    expose_outputs={"value": ("wrangle", "output0"), "geometry": ("wrangle", "output0")},
+    note="Boolean math is a point wrangle. It preserves the operation, not a Blender field evaluator.",
+    code_kind="vex",
+    code="i@value = i@a && i@b;\n",
+    parameter_builder=lambda node: {"snippet": _boolean_snippet(node), "class": "point"},
+)
+HOUDINI_RECIPES["attribute.position"] = _vex_recipe(
+    "attribute.position",
+    "v@position = @P;\n",
+    note="Position is Houdini's @P. A wrangle copies it to @position for downstream bindings.",
+    output="vector",
+)
+HOUDINI_RECIPES["attribute.normal"] = _vex_recipe(
+    "attribute.normal",
+    "v@normal = @N;\n",
+    note="Normal is Houdini's @N.",
+    output="vector",
+)
+HOUDINI_RECIPES["attribute.index"] = _vex_recipe(
+    "attribute.index",
+    "i@index = @ptnum;\n",
+    note="Index maps to @ptnum on points.",
+    output="value",
+)
+HOUDINI_RECIPES["attribute.id"] = _vex_recipe(
+    "attribute.id",
+    "i@nb_id = haspointattrib(0, \"id\") ? point(0, \"id\", @ptnum) : @ptnum;\n",
+    note="Blender ID reads Houdini's id point attribute when it exists, otherwise @ptnum.",
+    output="value",
+)
+HOUDINI_RECIPES["geometry.extrude"] = _recipe(
+    "geometry.extrude",
+    "polyextrude",
+    fidelity=TranslationStatus.LOWERED,
+    note="PolyExtrude matches the intent of Extrude Mesh. Inset and individual-face options are not fully reproduced.",
+    parameter_builder=_params,
+)
+HOUDINI_RECIPES["geometry.subdivide"] = _recipe(
+    "geometry.subdivide",
+    "subdivide",
+    fidelity=TranslationStatus.APPROXIMATE,
+    note="Houdini Subdivide is not Blender's subdivision algorithm.",
+    parameter_builder=_params,
+)
+HOUDINI_RECIPES["geometry.set_material"] = _recipe(
+    "geometry.set_material",
+    "material",
+    fidelity=TranslationStatus.LOWERED,
+    note="Material SOP assigns a shop material path. Blender material slots are not copied.",
+    parameter_builder=lambda node: {"shop_materialpath1": str(_params(node).get("material") or "")},
+)
+HOUDINI_RECIPES["geometry.rotate_instances"] = _vex_recipe(
+    "geometry.rotate_instances",
+    "p@orient = eulertoquaternion(radians(chv('rotation')), 0);\n",
+    note="Instance rotation is written to the orient attribute. Euler order follows Houdini's default.",
+)
+HOUDINI_RECIPES["geometry.scale_instances"] = _vex_recipe(
+    "geometry.scale_instances",
+    "v@scale = chv('scale');\nf@pscale = 1;\n",
+    note="Instance scale is written to @scale for Copy to Points.",
+)
+HOUDINI_RECIPES["geometry.switch"] = _recipe(
+    "geometry.switch",
+    "switch",
+    inputs=("input0", "input1"),
+    expose_inputs={"false": ("node", "input0"), "true": ("node", "input1"), "geometry": ("node", "input0")},
+    note="Switch SOP selects an input. Field-driven per-element switches are not a single SOP.",
+    fidelity=TranslationStatus.LOWERED,
+    parameter_builder=_params,
+)
+HOUDINI_RECIPES["geometry.curve_to_mesh"] = _recipe(
+    "geometry.curve_to_mesh",
+    "sweep",
+    inputs=("input0", "input1"),
+    expose_inputs={"curve": ("node", "input0"), "profile": ("node", "input1")},
+    expose_outputs={"geometry": ("node", "output0")},
+    fidelity=TranslationStatus.APPROXIMATE,
+    note="Sweep builds a mesh from a backbone and profile. It is not identical to Curve to Mesh.",
+)
+HOUDINI_RECIPES["geometry.resample_curve"] = _recipe(
+    "geometry.resample_curve",
+    "resample",
+    expose_inputs={"curve": ("node", "input0"), "geometry": ("node", "input0")},
+    expose_outputs={"curve": ("node", "output0"), "geometry": ("node", "output0")},
+    fidelity=TranslationStatus.LOWERED,
+    note="Resample SOP matches the intent of Resample Curve.",
+    parameter_builder=_params,
+)
+HOUDINI_RECIPES["geometry.curve_primitive"] = _recipe(
+    "geometry.curve_primitive",
+    "circle",
+    inputs=(),
+    expose_outputs={"curve": ("node", "output0"), "geometry": ("node", "output0")},
+    fidelity=TranslationStatus.LOWERED,
+    note="Curve primitives become circle or line SOPs. Primitive kind selects the node type.",
+    parameter_builder=_params,
+)
+HOUDINI_RECIPES["geometry.proximity"] = Recipe(
+    operation="geometry.proximity",
+    fidelity=TranslationStatus.CUSTOM_CODE,
+    nodes=(
+        NodeTemplate(
+            local_id="wrangle",
+            native_type="attribwrangle",
+            inputs=("input0", "input1"),
+            outputs=("output0",),
+        ),
+    ),
+    expose_inputs={"source": ("wrangle", "input0"), "target": ("wrangle", "input1"), "geometry": ("wrangle", "input0")},
+    expose_outputs={"distance": ("wrangle", "output0"), "position": ("wrangle", "output0"), "geometry": ("wrangle", "output0")},
+    note="Proximity uses xyzdist against the second input. Attribute names differ from Blender.",
+    code_kind="vex",
+    code="int prim; vector uv; f@distance = xyzdist(1, @P, prim, uv); v@position = primuv(1, \"P\", prim, uv);\n",
+    parameter_builder=lambda node: {
+        "snippet": 'int prim; vector uv; f@distance = xyzdist(1, @P, prim, uv); v@position = primuv(1, "P", prim, uv);\n',
+        "class": "point",
+    },
+)
+HOUDINI_RECIPES["geometry.raycast"] = _recipe(
+    "geometry.raycast",
+    "ray",
+    inputs=("input0", "input1"),
+    expose_inputs={"source": ("node", "input0"), "target": ("node", "input1"), "geometry": ("node", "input1")},
+    expose_outputs={"geometry": ("node", "output0"), "is_hit": ("node", "output0")},
+    fidelity=TranslationStatus.LOWERED,
+    note="Ray SOP performs the raycast. Hit attributes differ from Blender's Raycast node outputs.",
+)
+HOUDINI_RECIPES["graph.group"] = _recipe(
+    "graph.group",
+    "subnet",
+    note="Nested Blender node groups become Houdini subnets.",
+)
+HOUDINI_RECIPES["graph.reroute"] = _recipe(
+    "graph.reroute",
+    "null",
+    note="Reroutes are passthrough nulls when they were not collapsed earlier.",
+)
+HOUDINI_RECIPES["shader.principled_surface"] = _recipe(
+    "shader.principled_surface",
+    "principledshader",
+    inputs=(),
+    expose_inputs={"base_color": ("node", "basecolor"), "roughness": ("node", "rough"), "metallic": ("node", "metallic")},
+    expose_outputs={"shader": ("node", "output0")},
+    fidelity=TranslationStatus.LOWERED,
+    note="Principled Shader approximates Principled BSDF. Closures are not numerically identical.",
+    parameter_builder=_params,
+)
