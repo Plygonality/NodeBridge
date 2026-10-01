@@ -166,6 +166,8 @@ def analyze(
             sub_document = material_document(document, tree_name, name)
             sub = analyze(sub_document, target, replace(options, include_materials=False), frontend=frontend, fallback=fallback)
             result.materials[name] = sub
+            for entry in sub.report.entries:
+                entry.name = f"[{name}] {entry.name}"
             result.report.entries.extend(sub.report.entries)
             result.report.diagnostics.extend(d for d in sub.diagnostics if d.severity != Severity.INFO)
     return result

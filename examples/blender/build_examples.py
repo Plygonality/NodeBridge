@@ -17,6 +17,26 @@ import sys
 import bpy
 
 
+def arrange(tree, spacing_x=260.0, spacing_y=230.0):
+    """Lay nodes out left-to-right by dependency depth (positions are cosmetic)."""
+    depth = {node.name: 0 for node in tree.nodes}
+    for _ in range(len(tree.nodes)):
+        changed = False
+        for link in tree.links:
+            wanted = depth[link.from_node.name] + 1
+            if depth[link.to_node.name] < wanted:
+                depth[link.to_node.name] = wanted
+                changed = True
+        if not changed:
+            break
+    rows = {}
+    for node in tree.nodes:
+        column = depth[node.name]
+        row = rows.get(column, 0)
+        rows[column] = row + 1
+        node.location = (column * spacing_x, -row * spacing_y)
+
+
 def _link(tree, from_node, from_socket, to_node, to_socket):
     out = from_node.outputs[from_socket] if isinstance(from_socket, (int, str)) else from_socket
     inp = to_node.inputs[to_socket] if isinstance(to_socket, (int, str)) else to_socket
@@ -398,6 +418,8 @@ def build_all():
     building, building_obj = build_building()
     material = build_shader()
     compositor = build_compositor()
+    for tree in (scatter, building, bpy.data.node_groups["FloorSlab"], material.node_tree, compositor):
+        arrange(tree)
     return {"scatter": scatter, "building": building, "material": material, "compositor": compositor, "ground": ground, "building_object": building_obj}
 
 

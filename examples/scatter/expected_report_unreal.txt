@@ -15,27 +15,27 @@ Target:
 ✕ UNSUPPORTED:  0
 
 Operations:
-  ≈ EQUIVALENT  Geometry                   GEOMETRY_INPUT       -> PCG graph Input node
-  ~ APPROXIMATE Rock Shape                 PRIMITIVE            -> Engine basic shape
-  ≈ EQUIVALENT  Scatter Rocks              SCATTER              -> PCGSurfaceSamplerSettings
-  ~ APPROXIMATE Coverage Noise             SPATIAL_NOISE_MASK   -> folded into Spatial Noise + Density Filter
-  ~ APPROXIMATE Sink Rock                  TRANSFORM            -> Transform Points scale
-  ~ APPROXIMATE Remove Sparse Areas        DELETE_GEOMETRY      -> PCGSpatialNoiseSettings + PCGDensityFilterSettings
-  ≈ EQUIVALENT  Rock Material              MATERIAL_ASSIGNMENT  -> Static Mesh Spawner override material
-  ≈ EQUIVALENT  Random Scale               RANDOM_TRANSFORM     -> PCGTransformPointsSettings
-  ≈ EQUIVALENT  Random Rotation            RANDOM_TRANSFORM     -> PCGTransformPointsSettings
-  ~ APPROXIMATE Place Rocks                INSTANCE             -> PCGStaticMeshSpawnerSettings
-  ~ APPROXIMATE Realize Instances          REALIZE_INSTANCES    -> none (pass-through)
-  ≈ EQUIVALENT  Join Geometry              MERGE                -> PCGMergeSettings
-  ≈ EQUIVALENT  Geometry                   GEOMETRY_OUTPUT      -> PCG graph Output node
-  ≈ EQUIVALENT  Texture Coordinate Object  FIELD_INPUT          -> TextureCoordinate / LocalPosition / WorldPosition / VertexNormalWS
-  ✓ EXACT       Mapping                    MAPPING              -> Multiply + Add
-  ~ APPROXIMATE Rock Noise                 NOISE                -> MaterialExpressionNoise
-  ✓ EXACT       Rock Colors                COLOR_RAMP           -> Lerp chain with saturated remaps
-  ✓ EXACT       Roughness Range            MAP_RANGE            -> Subtract / Divide / Lerp
-  ~ APPROXIMATE Rock Bump                  BUMP                 -> DDX/DDY screen-space bump
-  ≈ EQUIVALENT  Principled BSDF            SHADER_BSDF          -> Default Lit material attributes
-  ✓ EXACT       Material Output            MATERIAL_OUTPUT      -> Material output pins
+  ≈ EQUIVALENT  Geometry                                    GEOMETRY_INPUT       -> PCG graph Input node
+  ~ APPROXIMATE Rock Shape                                  PRIMITIVE            -> Engine basic shape
+  ≈ EQUIVALENT  Scatter Rocks                               SCATTER              -> PCGSurfaceSamplerSettings
+  ~ APPROXIMATE Coverage Noise                              SPATIAL_NOISE_MASK   -> folded into Spatial Noise + Density Filter
+  ~ APPROXIMATE Sink Rock                                   TRANSFORM            -> Transform Points scale
+  ~ APPROXIMATE Remove Sparse Areas                         DELETE_GEOMETRY      -> PCGSpatialNoiseSettings + PCGDensityFilterSettings
+  ≈ EQUIVALENT  Rock Material                               MATERIAL_ASSIGNMENT  -> Static Mesh Spawner override material
+  ≈ EQUIVALENT  Random Scale                                RANDOM_TRANSFORM     -> PCGTransformPointsSettings
+  ≈ EQUIVALENT  Random Rotation                             RANDOM_TRANSFORM     -> PCGTransformPointsSettings
+  ~ APPROXIMATE Place Rocks                                 INSTANCE             -> PCGStaticMeshSpawnerSettings
+  ~ APPROXIMATE Realize Instances                           REALIZE_INSTANCES    -> none (pass-through)
+  ≈ EQUIVALENT  Join Geometry                               MERGE                -> PCGMergeSettings
+  ≈ EQUIVALENT  Geometry                                    GEOMETRY_OUTPUT      -> PCG graph Output node
+  ≈ EQUIVALENT  [ProceduralRock] Texture Coordinate Object  FIELD_INPUT          -> TextureCoordinate / LocalPosition / WorldPosition / VertexNormalWS
+  ✓ EXACT       [ProceduralRock] Mapping                    MAPPING              -> Multiply + Add
+  ~ APPROXIMATE [ProceduralRock] Rock Noise                 NOISE                -> MaterialExpressionNoise
+  ✓ EXACT       [ProceduralRock] Rock Colors                COLOR_RAMP           -> Lerp chain with saturated remaps
+  ✓ EXACT       [ProceduralRock] Roughness Range            MAP_RANGE            -> Subtract / Divide / Lerp
+  ~ APPROXIMATE [ProceduralRock] Rock Bump                  BUMP                 -> DDX/DDY screen-space bump
+  ≈ EQUIVALENT  [ProceduralRock] Principled BSDF            SHADER_BSDF          -> Default Lit material attributes
+  ✓ EXACT       [ProceduralRock] Material Output            MATERIAL_OUTPUT      -> Material output pins
 
 Approximations:
   Rock Shape (GeometryNodeMeshIcoSphere)
@@ -57,11 +57,11 @@ Approximations:
   Realize Instances (GeometryNodeRealizeInstances)
     Reason: PCG spawns instanced static mesh components; there is no 'realize' step.
     - Spawned meshes stay instances.
-  Rock Noise (ShaderNodeTexNoise)
+  [ProceduralRock] Rock Noise (ShaderNodeTexNoise)
     Reason: Blender fBm noise approximated with Unreal's gradient noise expression (output 0..1).
     - Pattern will not be numerically identical.
     - Color output reuses the scalar noise.
-  Rock Bump (ShaderNodeBump)
+  [ProceduralRock] Rock Bump (ShaderNodeBump)
     Reason: Height-based bump approximated from screen-space derivatives (no height-to-normal expression is constructible from Python).
     - Bump detail depends on screen resolution; strength is matched only roughly.
 
@@ -87,10 +87,10 @@ Equivalent (intent preserved, details differ):
     - Mesh geometry inputs are not merged; only point data and spawned results flow on.
   Geometry (NodeGroupOutput)
     Reason: Final point data / spawned meshes.
-  Texture Coordinate Object (ShaderNodeTexCoord)
+  [ProceduralRock] Texture Coordinate Object (ShaderNodeTexCoord)
     Reason: Coordinates converted to Blender conventions (UV V flipped; positions in meters, right-handed).
     - Blender's Generated coordinates are bounding-box normalized; Unreal local position is not.
-  Principled BSDF (ShaderNodeBsdfPrincipled)
+  [ProceduralRock] Principled BSDF (ShaderNodeBsdfPrincipled)
     Reason: Principled BSDF inputs map onto Unreal's Default Lit shading model; both are PBR but not identical.
     - Coat, sheen, subsurface and transmission are not mapped.
     - Alpha below 1 needs a translucent / masked blend mode.
