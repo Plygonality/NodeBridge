@@ -14,13 +14,12 @@ from ...compiler.subgraphs import has_field_interface, inline_where
 from ...ir.graph import TreeKind
 from ...ir.semantic import Const, ExposedParameter, SemanticGraph, SemanticOp
 from ...ir.types import GEOMETRY_TYPES, DataType
-from ...translation.confidence import Confidence
 from ..base import GeneratedCode, TargetBackend
 from ..codegen import PyWriter, clean_number, literal
 from ..registry import register_backend
 from .hscript import spare_parm_name
 from .runtime import HELPERS
-from .sop import Network, SopBuilder, Stream
+from .sop import Network, SopBuilder
 from .vex import library_definitions
 
 if TYPE_CHECKING:
@@ -243,7 +242,8 @@ def build_subnet(b: SopBuilder, op: SemanticOp) -> None:
         else:
             b.set_value(var, spare_parm_name(parameter.key), value, parameter.role, count=count, default=parameter.current, integer=integer)
     inputs_var = f"{var}_inputs"
-    b.w.line(f"{inputs_var} = {var}.indirectInputs()")
+    if inputs:
+        b.w.line(f"{inputs_var} = {var}.indirectInputs()")
     inner = SopBuilder(b.backend, b.result, sub, b.w, Network(var, sub.name, sub.parameters), b.vars, in_subnet=True, libraries=b.libraries)
     inner.indirect_inputs = inputs_var
     inner.materials = b.materials

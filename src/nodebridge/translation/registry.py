@@ -91,9 +91,11 @@ def translator(
 
     names = [kinds] if isinstance(kinds, str) else list(kinds)
 
+    target_registry = registry if registry is not None else REGISTRY
+
     def decorator(fn):
         for kind in names:
-            (registry or REGISTRY).register(
+            target_registry.register(
                 Translator(kind, target, context, fn, confidence, implementation, explanation, tuple(limitations), fallback, classify)
             )
         return fn

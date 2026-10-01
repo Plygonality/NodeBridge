@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from ... import __version__
@@ -80,11 +81,16 @@ class UnrealBackend(TargetBackend):
         w.line("for nb_warning in NB_WARNINGS:")
         w.line('    unreal.log_warning("NodeBridge: " + nb_warning)')
         name = unreal_asset_name(result.document.root)
+        code = w.text()
+        if "math." not in code.split('ASSET_PATH = "/Game/NodeBridge"', 1)[1]:
+            code = code.replace("import math\n\n", "", 1)
+        if len(re.findall(r"\binput_node\b", code)) == 1:
+            code = code.replace("    input_node = graph.get_input_node()\n", "", 1)
         return GeneratedCode(
             target=self.id,
             language="python",
             filename=f"nodebridge_{name}_unreal.py",
-            code=w.text(),
+            code=code,
             run_instructions="Unreal Editor: Window > Output Log, switch the command line to Python, paste and press Enter (or Tools > Execute Python Script). Requires the Python Editor Script Plugin.",
         )
 

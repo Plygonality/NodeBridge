@@ -124,11 +124,15 @@ def write_material_function(backend, result, w: PyWriter, variables: NameAllocat
         _material_output(builder, outputs[0])
     if builder.surface is None:
         builder.surface = builder.node(None, "mtlxstandard_surface", name=name)
+    w.line("material_nodes = (")
+    for node in builder.nodes:
+        w.line(f"    {node},")
+    w.line(")")
+    w.line("matnet.layoutChildren(items=material_nodes)")
     w.line("nb_box = matnet.createNetworkBox()")
-    w.line(f"for nb_item in ({', '.join(builder.nodes)},):")
+    w.line("for nb_item in material_nodes:")
     w.line("    nb_box.addItem(nb_item)")
     w.line(f"nb_box.setComment({name!r})")
-    w.line(f"matnet.layoutChildren(items=({', '.join(builder.nodes)},))")
     w.line("nb_box.fitAroundContents()")
     w.line(f"return {builder.surface}")
     w.dedent()

@@ -19,7 +19,7 @@ from ...common.coordinates import blender_euler_to_unreal_rotator, unreal_axis_s
 from ...common.names import NameAllocator, python_identifier, unreal_asset_name
 from ...common.units import ValueRole
 from ...compiler.evaluate import NotConstant, evaluate
-from ...ir.semantic import Const, InputValue, Link, Param, SemanticGraph, SemanticOp
+from ...ir.semantic import Const, InputValue, Link, SemanticGraph, SemanticOp
 from ...ir.types import GEOMETRY_TYPES
 from ...translation.confidence import Classification, Confidence as C
 from ...translation.registry import translator

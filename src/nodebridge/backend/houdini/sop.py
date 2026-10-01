@@ -965,9 +965,10 @@ def _material(b: SopBuilder, op: SemanticOp) -> None:
     b.connect(var, 0, stream)
     if group:
         b.set(var, "group1", group)
-    if name:
-        path = b.materials.get(name, f"/mat/{houdini_node_name(name)}")
-        b.set(var, "shop_materialpath1", path)
+    if name in b.materials:
+        b.w.line(f'nb_set({var}, "shop_materialpath1", {b.materials[name]})')
+    elif name:
+        b.set(var, "shop_materialpath1", f"/mat/{houdini_node_name(name)}")
     b.set_output(op, "geometry", var)
 
 
