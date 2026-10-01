@@ -1,0 +1,637 @@
+{
+  "__type__": "NodeTree",
+  "edges": [
+    {
+      "__type__": "GraphEdge",
+      "from_node": "texture_coordinate",
+      "from_socket": "Object",
+      "id": "e0",
+      "to_node": "noise_texture",
+      "to_socket": "Vector"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "noise_texture",
+      "from_socket": "Fac",
+      "id": "e1",
+      "to_node": "color_ramp",
+      "to_socket": "Fac"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "noise_texture",
+      "from_socket": "Fac",
+      "id": "e2",
+      "to_node": "roughness_range",
+      "to_socket": "Value"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "noise_texture",
+      "from_socket": "Fac",
+      "id": "e3",
+      "to_node": "bump",
+      "to_socket": "Height"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "color_ramp",
+      "from_socket": "Color",
+      "id": "e4",
+      "to_node": "principled_bsdf",
+      "to_socket": "Base Color"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "roughness_range",
+      "from_socket": "Result",
+      "id": "e5",
+      "to_node": "principled_bsdf",
+      "to_socket": "Roughness"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "bump",
+      "from_socket": "Normal",
+      "id": "e6",
+      "to_node": "principled_bsdf",
+      "to_socket": "Normal"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "principled_bsdf",
+      "from_socket": "BSDF",
+      "id": "e7",
+      "to_node": "material_output",
+      "to_socket": "Surface"
+    }
+  ],
+  "id": "weatheredmetal",
+  "interface": [],
+  "ir_version": "1.0",
+  "metadata": {
+    "source": "blender"
+  },
+  "name": "WeatheredMetal",
+  "nodes": [
+    {
+      "__type__": "GraphNode",
+      "id": "texture_coordinate",
+      "inputs": [],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Texture Coordinate",
+      "nested": null,
+      "node_type": "ShaderNodeTexCoord",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "vector3",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Object",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Object"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "vector3",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "UV",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "UV"
+        }
+      ],
+      "parameters": [],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "noise_texture",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "vector3",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Vector",
+          "is_field": true,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Vector"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 5.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Scale",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Scale"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Noise Texture",
+      "nested": null,
+      "node_type": "ShaderNodeTexNoise",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Fac",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Fac"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Color",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Color"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Scale",
+          "name": "Scale",
+          "value": 5.0
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "color_ramp",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Fac",
+          "is_field": true,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Fac"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Color Ramp",
+      "nested": null,
+      "node_type": "ShaderNodeValToRGB",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Color",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Color"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Alpha",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Alpha"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Fac",
+          "name": "Fac",
+          "value": 0.0
+        }
+      ],
+      "properties": {
+        "color_ramp": [
+          {
+            "color": [
+              0.05,
+              0.05,
+              0.05,
+              1.0
+            ],
+            "position": 0.0
+          },
+          {
+            "color": [
+              0.8,
+              0.45,
+              0.2,
+              1.0
+            ],
+            "position": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "roughness_range",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Value",
+          "is_field": true,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Value"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "From Min",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "From Min"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 1.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "From Max",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "From Max"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.2,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "To Min",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "To Min"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.85,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "To Max",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "To Max"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Roughness Range",
+      "nested": null,
+      "node_type": "ShaderNodeMapRange",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Result",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Result"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Value",
+          "name": "Value",
+          "value": 0.0
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "From Min",
+          "name": "From Min",
+          "value": 0.0
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "From Max",
+          "name": "From Max",
+          "value": 1.0
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "To Min",
+          "name": "To Min",
+          "value": 0.2
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "To Max",
+          "name": "To Max",
+          "value": 0.85
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "bump",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.2,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Strength",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Strength"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Height",
+          "is_field": true,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Height"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Bump",
+      "nested": null,
+      "node_type": "ShaderNodeBump",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "vector3",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Normal",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Normal"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Strength",
+          "name": "Strength",
+          "value": 0.2
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Height",
+          "name": "Height",
+          "value": 0.0
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "principled_bsdf",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": [
+            0.8,
+            0.8,
+            0.8,
+            1.0
+          ],
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Base Color",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Base Color"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.5,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Roughness",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Roughness"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Metallic",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Metallic"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "vector3",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Normal",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Normal"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Principled BSDF",
+      "nested": null,
+      "node_type": "ShaderNodeBsdfPrincipled",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "any",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "BSDF",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "BSDF"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "color",
+          "exposed": false,
+          "identifier": "Base Color",
+          "name": "Base Color",
+          "value": [
+            0.8,
+            0.8,
+            0.8,
+            1.0
+          ]
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Roughness",
+          "name": "Roughness",
+          "value": 0.5
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Metallic",
+          "name": "Metallic",
+          "value": 0.0
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "material_output",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "any",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Surface",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Surface"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Material Output",
+      "nested": null,
+      "node_type": "ShaderNodeOutputMaterial",
+      "outputs": [],
+      "parameters": [],
+      "properties": {}
+    }
+  ],
+  "system": "shader"
+}
