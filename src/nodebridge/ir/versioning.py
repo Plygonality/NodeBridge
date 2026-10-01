@@ -7,7 +7,7 @@ from typing import Any, Callable, Protocol
 
 from nodebridge.core.exceptions import VersionError
 
-PACKAGE_VERSION = "0.2.0"
+PACKAGE_VERSION = "0.3.0"
 IR_VERSION = "1"
 SUPPORTED_IR_VERSIONS = frozenset({"1"})
 

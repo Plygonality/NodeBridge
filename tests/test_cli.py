@@ -64,4 +64,4 @@ def test_cli_plan(tmp_path: Path, capsys: object) -> None:
 def test_cli_version(capsys: object) -> None:
     assert main(["--version"]) == 0
     output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "NodeBridge 0.2.0" in output
+    assert "NodeBridge 0.3.0" in output

@@ -56,7 +56,12 @@ def test_core_layers_do_not_import_host_sdks() -> None:
 
 
 def test_entire_package_has_no_static_host_sdk_imports() -> None:
+    addon = CORE_ROOT / "addon"
     for path in _iter_python_files(CORE_ROOT):
+        if addon in path.parents:
+            # The Blender N-panel is the only layer allowed to name bpy.
+            # import nodebridge does not import this package.
+            continue
         imported = _imported_modules(path)
         leaked = imported & FORBIDDEN_MODULES
         assert not leaked, f"{path} imports {sorted(leaked)}"
@@ -69,7 +74,7 @@ def test_importing_nodebridge_does_not_require_host_sdks() -> None:
     from nodebridge.backends.unreal import UnrealBackend
     from nodebridge.hosts import list_hosts
 
-    assert nodebridge.__version__ == "0.2.0"
+    assert nodebridge.__version__ == "0.3.0"
     assert BlenderExtractor.application == "blender"
     assert HoudiniBackend.name == "houdini"
     assert UnrealBackend.name == "unreal"

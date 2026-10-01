@@ -29,7 +29,8 @@ def test_plan_classifies_exact_and_custom_code() -> None:
     assert by_op["geometry.transform"].fidelity is TranslationStatus.EXACT
     assert by_op["vector.add"].fidelity is TranslationStatus.CUSTOM_CODE
     assert can_implement("houdini", "geometry.transform")
-    assert not can_implement("houdini", "shader.principled_surface")
+    assert can_implement("houdini", "shader.principled_surface")
+    assert not can_implement("houdini", "simulation.zone")
 
 
 def test_one_to_many_lowering() -> None:
@@ -46,7 +47,7 @@ def test_one_to_many_lowering() -> None:
 
 def test_unsupported_operation_is_visible() -> None:
     graph = IRGraph(id="graph_x", name="x")
-    graph.add_node(IRNode(id="node_x", operation="shader.principled_surface"))
+    graph.add_node(IRNode(id="node_x", operation="simulation.zone"))
     result = compile_graph(graph, "houdini")
     assert result.report.outcomes[0].status is TranslationStatus.UNSUPPORTED
     assert result.native_graph.nodes[0].type == "nodebridge.unsupported"

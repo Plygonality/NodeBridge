@@ -37,7 +37,9 @@ def test_implementation_for_known_and_unknown_ops() -> None:
     houdini = get_host("houdini")
     exact = houdini.implementation_for("geometry.transform")
     assert exact.available
-    missing = houdini.implementation_for("shader.principled_surface")
+    surface = houdini.implementation_for("shader.principled_surface")
+    assert surface.available
+    missing = houdini.implementation_for("simulation.zone")
     assert not missing.available
     fragment = houdini.backend.lower_node(IRNode(id="n", operation="geometry.transform"))
     assert fragment.nodes[0].type == "xform"
