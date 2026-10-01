@@ -1,67 +1,35 @@
-"""CLI inspect / validate / report tests."""
-
-from __future__ import annotations
-
+import json
 from pathlib import Path
 
 from nodebridge.cli.main import main
-from nodebridge.ir.serializer import dump
-from tests.helpers import make_transform_graph
+from nodebridge.compiler import compile_source
+from nodebridge.examples.graphs import scatter_tree
+from nodebridge.frontend.blender import BlenderFrontend
+from nodebridge.ir.serialization import dump
 
 
-def test_cli_inspect(tmp_path: Path, capsys: object) -> None:
-    path = tmp_path / "graph.nodebridge.json"
-    dump(make_transform_graph().graph, path)
-    assert main(["inspect", str(path)]) == 0
-    output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "transform_geometry" in output
-    assert "geometry.transform" in output
+def test_cli_compiles_the_scatter_example(tmp_path: Path, capsys):
+    code_path = tmp_path / "scatter.py"
+    report_path = tmp_path / "scatter.txt"
+    status = main(["compile", "--example", "scatter", "--target", "houdini", "--output", str(code_path), "--report", str(report_path)])
+    assert status == 0
+    code = code_path.read_text(encoding="utf-8")
+    report = report_path.read_text(encoding="utf-8")
+    assert "createNode('scatter::2.0'" in code
+    assert "Geometry Nodes / ScatterBuildings" in report
+    captured = capsys.readouterr()
+    assert captured.out == ""
 
 
-def test_cli_validate_ok(tmp_path: Path, capsys: object) -> None:
-    path = tmp_path / "graph.nodebridge.json"
-    dump(make_transform_graph().graph, path)
-    assert main(["validate", str(path)]) == 0
-    output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert output.startswith("OK")
-
-
-def test_cli_report(tmp_path: Path, capsys: object) -> None:
-    path = tmp_path / "graph.nodebridge.json"
-    dump(make_transform_graph().graph, path)
-    assert main(["report", str(path), "--target", "houdini"]) == 0
-    output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "NodeBridge Translation Report" in output
-
-
-def test_cli_translate_compiles(tmp_path: Path, capsys: object) -> None:
-    path = tmp_path / "graph.nodebridge.json"
-    dump(make_transform_graph().graph, path)
-    assert main(["translate", str(path), "--target", "houdini"]) == 0
-    output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "NodeBridge Translation Report" in output
-    assert "xform" in output or "Native nodes:" in output
-
-
-def test_cli_capabilities(capsys: object) -> None:
-    assert main(["capabilities"]) == 0
-    output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "blender" in output
-    assert "houdini" in output
-    assert main(["capabilities", "unreal"]) == 0
-    output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "pcg" in output
-
-
-def test_cli_plan(tmp_path: Path, capsys: object) -> None:
-    path = tmp_path / "graph.nodebridge.json"
-    dump(make_transform_graph().graph, path)
-    assert main(["plan", str(path), "--target", "houdini"]) == 0
-    output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "geometry.transform" in output
-
-
-def test_cli_version(capsys: object) -> None:
-    assert main(["--version"]) == 0
-    output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "NodeBridge 0.2.0" in output
+def test_cli_compiles_serialized_graph_ir(tmp_path: Path):
+    tree = BlenderFrontend().parse(scatter_tree())
+    path = tmp_path / "scatter.json"
+    dump(tree, str(path))
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    assert loaded["__type__"] == "NodeTree"
+    output = tmp_path / "out.py"
+    status = main(["compile", "--input", str(path), "--target", "unreal", "--output", str(output)])
+    assert status == 0
+    assert "PCGGraphFactory" in output.read_text(encoding="utf-8")
+    direct = compile_source(scatter_tree(), "unreal")
+    assert "PCGSurfaceSamplerSettings" in direct.code

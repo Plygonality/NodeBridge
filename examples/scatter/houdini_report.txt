@@ -1,0 +1,41 @@
+NodeBridge translation report
+
+Source:
+Geometry Nodes / ScatterBuildings
+
+Target:
+Houdini
+
+8 source nodes
+8 semantic operations
+
+EXACT: 2
+EQUIVALENT: 6
+APPROXIMATE: 0
+UNSUPPORTED: 0
+
+Limitations:
+Group Input (group_input)
+A geometry group input becomes an Object Merge. Assign Source Object on the container.
+The object path is a Houdini SOP path, not a Blender object datablock.
+
+Building Scatter (scatter)
+Distribute Points on Faces becomes a Scatter SOP in density mode. Houdini's random distribution is not Blender's, so the same seed does not reproduce the same points.
+Target random samples may differ.
+Poisson disk is not a hard minimum distance.
+
+Random Scale (random)
+Random values use NodeBridge's hash when deterministic randomness is on, otherwise Houdini rand(). Neither is Blender's sequence.
+Target random samples may differ from Blender.
+
+Random Rotation (random)
+Random values use NodeBridge's hash when deterministic randomness is on, otherwise Houdini rand(). Neither is Blender's sequence.
+Target random samples may differ from Blender.
+
+Instance on Points (instance)
+Instance on Points becomes Copy to Points. The first input is the instance geometry and the second input is the points. Scale and rotation are point attributes.
+Packed instance pivots follow Copy to Points, which is not identical to Blender's instance transform.
+
+Rewrite rules considered: spatial_noise_mask, random_transform
+
+Exact means the target should follow the source closely. Equivalent preserves the procedural intention and may differ in samples or topology. Approximate is a similar result, not the full source behavior. NodeBridge does not claim vertex-identical or pixel-identical output unless a translation is exact and this report lists no numerical limitation.

@@ -1,0 +1,49 @@
+NodeBridge translation report
+
+Source:
+Compositor / GradeAndGlare
+
+Target:
+Unreal Engine 5
+
+6 source nodes
+6 semantic operations
+
+EXACT: 0
+EQUIVALENT: 0
+APPROXIMATE: 2
+UNSUPPORTED: 4
+
+Unsupported:
+CompositorNodeRLayers (Render Layers)
+Reason:
+No Unreal compositor equivalent is implemented for render_layer.
+Fallback: listed in the script and omitted from the material
+
+CompositorNodeGlare (Glare)
+Reason:
+No Unreal compositor equivalent is implemented for glare.
+Fallback: listed in the script and omitted from the material
+
+CompositorNodeEllipseMask (Vignette)
+Reason:
+No Unreal compositor equivalent is implemented for ellipse_mask.
+Fallback: listed in the script and omitted from the material
+
+CompositorNodeComposite (Composite)
+Reason:
+No Unreal compositor equivalent is implemented for composite_output.
+Fallback: listed in the script and omitted from the material
+
+Approximation:
+Color Correction (compositor_operation)
+brightness is only a color-material approximation of the compositor node.
+This is not a compositor graph. Glare and masks are not reproduced.
+
+Vignette Mix (compositor_operation)
+mix is only a color-material approximation of the compositor node.
+This is not a compositor graph. Glare and masks are not reproduced.
+
+Rewrite rules considered: spatial_noise_mask, random_transform
+
+Exact means the target should follow the source closely. Equivalent preserves the procedural intention and may differ in samples or topology. Approximate is a similar result, not the full source behavior. NodeBridge does not claim vertex-identical or pixel-identical output unless a translation is exact and this report lists no numerical limitation.

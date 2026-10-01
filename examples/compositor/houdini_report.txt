@@ -1,0 +1,35 @@
+NodeBridge translation report
+
+Source:
+Compositor / GradeAndGlare
+
+Target:
+Houdini
+
+6 source nodes
+6 semantic operations
+
+EXACT: 1
+EQUIVALENT: 1
+APPROXIMATE: 2
+UNSUPPORTED: 2
+
+Unsupported:
+CompositorNodeGlare (Glare)
+Reason:
+No reliable COP2 equivalent is implemented for glare.
+
+CompositorNodeEllipseMask (Vignette)
+Reason:
+No reliable COP2 equivalent is implemented for ellipse_mask.
+
+Approximation:
+Color Correction (compositor_operation)
+Color correction uses a COP2 color node when that type exists. The controls are not a match for Blender's compositor.
+
+Vignette Mix (compositor_operation)
+mix is represented by a labeled COP null because no specific node is mapped.
+
+Rewrite rules considered: spatial_noise_mask, random_transform
+
+Exact means the target should follow the source closely. Equivalent preserves the procedural intention and may differ in samples or topology. Approximate is a similar result, not the full source behavior. NodeBridge does not claim vertex-identical or pixel-identical output unless a translation is exact and this report lists no numerical limitation.

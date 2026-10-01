@@ -1,4 +1,4 @@
-"""Command-line interface."""
+"""NodeBridge command line."""
 
 from nodebridge.cli.main import main
 

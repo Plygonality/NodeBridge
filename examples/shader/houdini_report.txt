@@ -1,0 +1,35 @@
+NodeBridge translation report
+
+Source:
+Shader / WeatheredMetal
+
+Target:
+Houdini
+
+7 source nodes
+7 semantic operations
+
+EXACT: 1
+EQUIVALENT: 1
+APPROXIMATE: 5
+UNSUPPORTED: 0
+
+Approximation:
+Texture Coordinate (attribute_read)
+attribute_read is kept as a comment in the material script.
+
+Noise Texture (noise)
+Houdini noise does not reproduce Blender's noise texture.
+
+Color Ramp (color_operation)
+Color ramp stops are recorded in a comment. The ramp VOP uses its default keys unless you edit them.
+
+Roughness Range (map_range)
+map_range is kept as a comment in the material script.
+
+Bump (shader_operation)
+shader_operation is kept as a comment in the material script.
+
+Rewrite rules considered: spatial_noise_mask, random_transform
+
+Exact means the target should follow the source closely. Equivalent preserves the procedural intention and may differ in samples or topology. Approximate is a similar result, not the full source behavior. NodeBridge does not claim vertex-identical or pixel-identical output unless a translation is exact and this report lists no numerical limitation.
