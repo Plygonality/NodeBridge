@@ -1,68 +1,25 @@
 # Roadmap
 
-Do not attempt every node in every DCC. Build vertically: a complete
-path for a small semantic subset, then widen.
+## Done in 0.3
 
-This roadmap is reconciled with the repository. Milestone 1 (core IR)
-shipped in 0.1. Version 0.2 implements the many-to-many compiler
-architecture and a Blender ↔ Houdini construction-plan slice — work that
-spans several of the originally numbered milestones.
+1. **Milestone 1:** Blender Geometry Nodes → Semantic IR → Houdini SOP network (scatter, instancing, random scale and rotation, noise masks, math, transforms, materials, extrusion, nested groups as subnets with promoted parameters).
+2. **Milestone 2:** Geometry Nodes → Unreal PCG graphs (point-processing subset).
+3. **Milestone 3:** Shader nodes → Houdini MaterialX and → Unreal Materials.
+4. **Milestone 4:** Compositor → Houdini COP2 and → Unreal Post Process Volume, where a semantic equivalent exists.
 
-## Completed
+## Next, in priority order
 
-### Milestone 1 — Semantic compiler core (0.1, evolved in 0.2)
+1. **Run the four examples in live Houdini 20.x and Unreal 5.4 / 5.5.** Record the parameter names, pin labels and property names reported in `NB_WARNINGS`, fix the mappings, and add version notes. This is the highest-value step: the generated code is so far verified structurally (recording fakes), not in a live session.
+2. **Unreal PCG graph parameters.** Use real PCG user parameters instead of script-level controls once the Python API can create them reliably.
+3. **Field coverage on Unreal.** Map more per-point fields onto PCG attribute nodes (Attribute Maths, Attribute Noise, Point From Mesh), and consider a Geometry Script context for mesh modelling (extrude, boolean, curves).
+4. **Houdini HDAs.** Optionally turn subnets that come from node groups into digital assets, with the group interface as the HDA interface.
+5. **Simulation and Repeat zones.** Houdini Solver SOPs and For-Each blocks are natural targets.
+6. **More shader coverage:** Principled coat/sheen/subsurface in MaterialX, Unreal Substrate, and material functions for shader groups.
+7. **Copernicus** (Houdini 20.5+) as the compositor target instead of COP2.
+8. **Round trips:** a Houdini frontend (SOP network → Graph IR) using the `SourceFrontend` interface.
+9. **Additional targets** through `TargetBackend`: Maya / Bifrost, Godot, Cinema 4D, Nuke, Substance Designer.
 
-IR, types, validation, JSON, diagnostics, operation catalog, package
-skeleton.
+## Explicitly not planned
 
-### Milestone 2–7 (architecture + vertical slice in 0.2)
-
-* Host plugin contract with frontend **and** backend per host
-* Capability model and translation planner
-* Blender Geometry Nodes frontend + backend (fixtures / construction plans)
-* Houdini SOP frontend + backend (fixtures / construction plans / VEX)
-* Bidirectional Blender ↔ Houdini slice for scattering + transforms
-* Unreal PCG frontend + backend contracts, fixtures, experimental scripts
-* Structured fidelity reports (`EXACT` … `UNSUPPORTED`)
-* CLI: inspect, validate, capabilities, plan, report, translate
-
-Live DCC execution is still optional and not CI-covered.
-
-## Next
-
-### Milestone 8 — Real Blender ↔ Houdini runtime slice
-
-Run the scattering subset against actual `bpy` and `hou` sessions.
-Verify editable Graphs in both applications. This is the highest-leverage
-next step for real-world usefulness.
-
-### Milestone 9 — Unreal PCG editor integration
-
-Where the experimental Python API permits: create a PCG graph asset,
-add Surface Sampler / Transform Points / Static Mesh Spawner, wire pins
-with verified labels. Keep fixture tests as the CI path.
-
-### Milestone 10 — Expanded semantic operation catalog
-
-Incrementally: more primitives, curves, attributes, selections, noise,
-deletes, joins. Each operation needs frontend + backend + tests + a
-fidelity label.
-
-### Milestone 11 — Round-trip metadata
-
-Richer provenance, translation history on generated nodes, and tools to
-diff two IR graphs semantically after an artist edit in the target DCC.
-Perfect equivalence is still not the goal.
-
-### Milestone 12 — Additional DCC host SDK
-
-Maya/Bifrost, Substance Designer, or Nuke as a fourth host implemented
-only through the host contract.
-
-## Explicitly later
-
-* Live localhost / IPC bridge
-* Simulation and repeat zones
-* Full shader / compositor coverage
-* Baking evaluators
-* USD / MaterialX interchange
+* Promising vertex- or pixel-identical results between applications.
+* An AI model in the translation path. An optional suggestion provider may come later.

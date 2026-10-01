@@ -1,0 +1,2107 @@
+{
+  "format": "nodebridge.graph",
+  "format_version": 1,
+  "nodebridge_version": "0.3.0",
+  "root": "BuildingGenerator",
+  "source": {
+    "application": "Blender 4.2.23 LTS",
+    "display_name": "BuildingGenerator",
+    "unit_scale": 1.0,
+    "fps": 24.0,
+    "object": "Building",
+    "modifier": "NodeBridge Example",
+    "object_dimensions": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "tree_kind": "geometry",
+    "tree": "BuildingGenerator"
+  },
+  "trees": [
+    {
+      "name": "BuildingGenerator",
+      "kind": "geometry",
+      "is_group": false,
+      "interface": [
+        {
+          "identifier": "Socket_7",
+          "name": "Geometry",
+          "in_out": "OUTPUT",
+          "type": "geometry"
+        },
+        {
+          "identifier": "Socket_0",
+          "name": "Geometry",
+          "in_out": "INPUT",
+          "type": "geometry"
+        },
+        {
+          "identifier": "Socket_1",
+          "name": "Width",
+          "in_out": "INPUT",
+          "type": "float",
+          "subtype": "DISTANCE",
+          "default": 10.0,
+          "min_value": 1.0,
+          "max_value": 100.0,
+          "value": 10.0
+        },
+        {
+          "identifier": "Socket_2",
+          "name": "Depth",
+          "in_out": "INPUT",
+          "type": "float",
+          "subtype": "DISTANCE",
+          "default": 8.0,
+          "min_value": 1.0,
+          "max_value": 100.0,
+          "value": 8.0
+        },
+        {
+          "identifier": "Socket_3",
+          "name": "Floors",
+          "in_out": "INPUT",
+          "type": "int",
+          "default": 6,
+          "min_value": 1,
+          "max_value": 60,
+          "value": 6
+        },
+        {
+          "identifier": "Socket_4",
+          "name": "Floor Height",
+          "in_out": "INPUT",
+          "type": "float",
+          "subtype": "DISTANCE",
+          "default": 3.0,
+          "min_value": 2.0,
+          "max_value": 10.0,
+          "value": 3.0
+        },
+        {
+          "identifier": "Socket_5",
+          "name": "Window Density",
+          "in_out": "INPUT",
+          "type": "float",
+          "default": 0.35,
+          "min_value": 0.0,
+          "max_value": 5.0,
+          "value": 0.35
+        },
+        {
+          "identifier": "Socket_6",
+          "name": "Seed",
+          "in_out": "INPUT",
+          "type": "int",
+          "default": 1,
+          "min_value": -2147483648,
+          "max_value": 2147483647,
+          "value": 1
+        }
+      ],
+      "nodes": [
+        {
+          "id": "Group Input",
+          "type": "NodeGroupInput",
+          "inputs": [],
+          "outputs": [
+            {
+              "identifier": "Socket_0",
+              "name": "Geometry",
+              "type": "geometry"
+            },
+            {
+              "identifier": "Socket_1",
+              "name": "Width",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 10.0,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_2",
+              "name": "Depth",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 8.0,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_3",
+              "name": "Floors",
+              "type": "int",
+              "default": 6,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_4",
+              "name": "Floor Height",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 3.0,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_5",
+              "name": "Window Density",
+              "type": "float",
+              "default": 0.35,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_6",
+              "name": "Seed",
+              "type": "int",
+              "default": 1,
+              "linked": true
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Group Output",
+          "type": "NodeGroupOutput",
+          "inputs": [
+            {
+              "identifier": "Socket_7",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "outputs": [],
+          "parameters": {
+            "is_active_output": true
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Footprint",
+          "type": "GeometryNodeMeshGrid",
+          "label": "Footprint",
+          "inputs": [
+            {
+              "identifier": "Size X",
+              "name": "Size X",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Size Y",
+              "name": "Size Y",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Vertices X",
+              "name": "Vertices X",
+              "type": "int",
+              "default": 2
+            },
+            {
+              "identifier": "Vertices Y",
+              "name": "Vertices Y",
+              "type": "int",
+              "default": 2
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "UV Map",
+              "name": "UV Map",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Building Height",
+          "type": "ShaderNodeMath",
+          "label": "Building Height",
+          "inputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "linked": true
+            },
+            {
+              "identifier": "Value_001",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "linked": true
+            },
+            {
+              "identifier": "Value_002",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "operation": "MULTIPLY",
+            "use_clamp": false
+          },
+          "internal_links": [
+            [
+              "Value",
+              "Value"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Building Mass",
+          "type": "GeometryNodeExtrudeMesh",
+          "label": "Building Mass",
+          "inputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Offset",
+              "name": "Offset",
+              "type": "vector3",
+              "subtype": "TRANSLATION",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Offset Scale",
+              "name": "Offset Scale",
+              "type": "float",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Individual",
+              "name": "Individual",
+              "type": "bool",
+              "default": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Top",
+              "name": "Top",
+              "type": "bool",
+              "default": false
+            },
+            {
+              "identifier": "Side",
+              "name": "Side",
+              "type": "bool",
+              "default": false
+            }
+          ],
+          "parameters": {
+            "mode": "FACES"
+          },
+          "internal_links": [
+            [
+              "Mesh",
+              "Mesh"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Floor Offset",
+          "type": "ShaderNodeCombineXYZ",
+          "inputs": [
+            {
+              "identifier": "X",
+              "name": "X",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "Y",
+              "name": "Y",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "Z",
+              "name": "Z",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Z",
+              "Vector"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Floor Levels",
+          "type": "GeometryNodeMeshLine",
+          "label": "Floor Levels",
+          "inputs": [
+            {
+              "identifier": "Count",
+              "name": "Count",
+              "type": "int",
+              "default": 10,
+              "linked": true
+            },
+            {
+              "identifier": "Resolution",
+              "name": "Resolution",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 1.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Start Location",
+              "name": "Start Location",
+              "type": "vector3",
+              "subtype": "TRANSLATION",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Offset",
+              "name": "Offset",
+              "type": "vector3",
+              "subtype": "TRANSLATION",
+              "default": [
+                0.0,
+                0.0,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "mode": "OFFSET",
+            "count_mode": "TOTAL"
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Slab Width",
+          "type": "ShaderNodeMath",
+          "inputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "linked": true
+            },
+            {
+              "identifier": "Value_001",
+              "name": "Value",
+              "type": "float",
+              "default": 0.6
+            },
+            {
+              "identifier": "Value_002",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "operation": "ADD",
+            "use_clamp": false
+          },
+          "internal_links": [
+            [
+              "Value",
+              "Value"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Slab Depth",
+          "type": "ShaderNodeMath",
+          "inputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "linked": true
+            },
+            {
+              "identifier": "Value_001",
+              "name": "Value",
+              "type": "float",
+              "default": 0.6
+            },
+            {
+              "identifier": "Value_002",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "operation": "ADD",
+            "use_clamp": false
+          },
+          "internal_links": [
+            [
+              "Value",
+              "Value"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Floor Slab",
+          "type": "GeometryNodeGroup",
+          "label": "Floor Slab",
+          "inputs": [
+            {
+              "identifier": "Socket_0",
+              "name": "Width",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 10.0,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_1",
+              "name": "Depth",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 8.0,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_2",
+              "name": "Thickness",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 0.25
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Socket_3",
+              "name": "Slab",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "group_tree": "FloorSlab",
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Stack Floors",
+          "type": "GeometryNodeInstanceOnPoints",
+          "label": "Stack Floors",
+          "inputs": [
+            {
+              "identifier": "Points",
+              "name": "Points",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Instance",
+              "name": "Instance",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Pick Instance",
+              "name": "Pick Instance",
+              "type": "bool",
+              "default": false
+            },
+            {
+              "identifier": "Instance Index",
+              "name": "Instance Index",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "identifier": "Rotation",
+              "name": "Rotation",
+              "type": "rotation",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Scale",
+              "name": "Scale",
+              "type": "vector3",
+              "subtype": "XYZ",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Instances",
+              "name": "Instances",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Points",
+              "Instances"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Realize Floors",
+          "type": "GeometryNodeRealizeInstances",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Realize All",
+              "name": "Realize All",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Depth",
+              "name": "Depth",
+              "type": "int",
+              "default": 0
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Normal",
+          "type": "GeometryNodeInputNormal",
+          "inputs": [],
+          "outputs": [
+            {
+              "identifier": "Normal",
+              "name": "Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Separate XYZ",
+          "type": "ShaderNodeSeparateXYZ",
+          "inputs": [
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "X",
+              "name": "X",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "Y",
+              "name": "Y",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "Z",
+              "name": "Z",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Vector",
+              "Z"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Facade Facing",
+          "type": "ShaderNodeMath",
+          "inputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "linked": true
+            },
+            {
+              "identifier": "Value_001",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "enabled": false
+            },
+            {
+              "identifier": "Value_002",
+              "name": "Value",
+              "type": "float",
+              "default": 0.5,
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "operation": "ABSOLUTE",
+            "use_clamp": false
+          },
+          "internal_links": [
+            [
+              "Value",
+              "Value"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Is Wall",
+          "type": "FunctionNodeCompare",
+          "label": "Is Wall",
+          "inputs": [
+            {
+              "identifier": "A",
+              "name": "A",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "B",
+              "name": "B",
+              "type": "float",
+              "default": 0.1
+            },
+            {
+              "identifier": "A_INT",
+              "name": "A",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "B_INT",
+              "name": "B",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "A_VEC3",
+              "name": "A",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "B_VEC3",
+              "name": "B",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "A_COL",
+              "name": "A",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "B_COL",
+              "name": "B",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "A_STR",
+              "name": "A",
+              "type": "string",
+              "default": "",
+              "enabled": false
+            },
+            {
+              "identifier": "B_STR",
+              "name": "B",
+              "type": "string",
+              "default": "",
+              "enabled": false
+            },
+            {
+              "identifier": "C",
+              "name": "C",
+              "type": "float",
+              "default": 0.9,
+              "enabled": false
+            },
+            {
+              "identifier": "Angle",
+              "name": "Angle",
+              "type": "float",
+              "subtype": "ANGLE",
+              "default": 0.087266,
+              "enabled": false
+            },
+            {
+              "identifier": "Epsilon",
+              "name": "Epsilon",
+              "type": "float",
+              "default": 0.001,
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Result",
+              "name": "Result",
+              "type": "bool",
+              "default": false,
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "operation": "LESS_THAN",
+            "data_type": "FLOAT",
+            "mode": "ELEMENT"
+          },
+          "internal_links": [
+            [
+              "A",
+              "Result"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Window Positions",
+          "type": "GeometryNodeDistributePointsOnFaces",
+          "label": "Window Positions",
+          "inputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true,
+              "linked": true
+            },
+            {
+              "identifier": "Distance Min",
+              "name": "Distance Min",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Density Max",
+              "name": "Density Max",
+              "type": "float",
+              "default": 10.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Density",
+              "name": "Density",
+              "type": "float",
+              "default": 10.0,
+              "linked": true
+            },
+            {
+              "identifier": "Density Factor",
+              "name": "Density Factor",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 1.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Seed",
+              "name": "Seed",
+              "type": "int",
+              "default": 0,
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Points",
+              "name": "Points",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Normal",
+              "name": "Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Rotation",
+              "name": "Rotation",
+              "type": "rotation",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "parameters": {
+            "distribute_method": "RANDOM",
+            "use_legacy_normal": false
+          },
+          "internal_links": [
+            [
+              "Mesh",
+              "Points"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Window Panel",
+          "type": "GeometryNodeMeshCube",
+          "label": "Window Panel",
+          "inputs": [
+            {
+              "identifier": "Size",
+              "name": "Size",
+              "type": "vector3",
+              "subtype": "TRANSLATION",
+              "default": [
+                0.9,
+                0.9,
+                1.3
+              ]
+            },
+            {
+              "identifier": "Vertices X",
+              "name": "Vertices X",
+              "type": "int",
+              "default": 2
+            },
+            {
+              "identifier": "Vertices Y",
+              "name": "Vertices Y",
+              "type": "int",
+              "default": 2
+            },
+            {
+              "identifier": "Vertices Z",
+              "name": "Vertices Z",
+              "type": "int",
+              "default": 2
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "UV Map",
+              "name": "UV Map",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Window Variation",
+          "type": "FunctionNodeRandomValue",
+          "label": "Window Variation",
+          "inputs": [
+            {
+              "identifier": "Min",
+              "name": "Min",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Max",
+              "name": "Max",
+              "type": "vector3",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Min_001",
+              "name": "Min",
+              "type": "float",
+              "default": 0.7
+            },
+            {
+              "identifier": "Max_001",
+              "name": "Max",
+              "type": "float",
+              "default": 1.2
+            },
+            {
+              "identifier": "Min_002",
+              "name": "Min",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "Max_002",
+              "name": "Max",
+              "type": "int",
+              "default": 100,
+              "enabled": false
+            },
+            {
+              "identifier": "Probability",
+              "name": "Probability",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.5,
+              "enabled": false
+            },
+            {
+              "identifier": "ID",
+              "name": "ID",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "identifier": "Seed",
+              "name": "Seed",
+              "type": "int",
+              "default": 0,
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Value_001",
+              "name": "Value",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "Value_002",
+              "name": "Value",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "Value_003",
+              "name": "Value",
+              "type": "bool",
+              "default": false,
+              "enabled": false
+            }
+          ],
+          "parameters": {
+            "data_type": "FLOAT"
+          },
+          "internal_links": [
+            [
+              "Seed",
+              "Value_001"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Place Windows",
+          "type": "GeometryNodeInstanceOnPoints",
+          "label": "Place Windows",
+          "inputs": [
+            {
+              "identifier": "Points",
+              "name": "Points",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Instance",
+              "name": "Instance",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Pick Instance",
+              "name": "Pick Instance",
+              "type": "bool",
+              "default": false
+            },
+            {
+              "identifier": "Instance Index",
+              "name": "Instance Index",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "identifier": "Rotation",
+              "name": "Rotation",
+              "type": "rotation",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Scale",
+              "name": "Scale",
+              "type": "vector3",
+              "subtype": "XYZ",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Instances",
+              "name": "Instances",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Points",
+              "Instances"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Realize Windows",
+          "type": "GeometryNodeRealizeInstances",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Realize All",
+              "name": "Realize All",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Depth",
+              "name": "Depth",
+              "type": "int",
+              "default": 0
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Assemble Building",
+          "type": "GeometryNodeJoinGeometry",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Concrete",
+          "type": "GeometryNodeSetMaterial",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Material",
+              "name": "Material",
+              "type": "material",
+              "default": {
+                "id_type": "Material",
+                "name": "Concrete"
+              }
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": [
+            "Group Input",
+            "Socket_1"
+          ],
+          "to": [
+            "Footprint",
+            "Size X"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_2"
+          ],
+          "to": [
+            "Footprint",
+            "Size Y"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_3"
+          ],
+          "to": [
+            "Building Height",
+            "Value"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_4"
+          ],
+          "to": [
+            "Building Height",
+            "Value_001"
+          ]
+        },
+        {
+          "from": [
+            "Footprint",
+            "Mesh"
+          ],
+          "to": [
+            "Building Mass",
+            "Mesh"
+          ]
+        },
+        {
+          "from": [
+            "Building Height",
+            "Value"
+          ],
+          "to": [
+            "Building Mass",
+            "Offset Scale"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_4"
+          ],
+          "to": [
+            "Floor Offset",
+            "Z"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_3"
+          ],
+          "to": [
+            "Floor Levels",
+            "Count"
+          ]
+        },
+        {
+          "from": [
+            "Floor Offset",
+            "Vector"
+          ],
+          "to": [
+            "Floor Levels",
+            "Offset"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_1"
+          ],
+          "to": [
+            "Slab Width",
+            "Value"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_2"
+          ],
+          "to": [
+            "Slab Depth",
+            "Value"
+          ]
+        },
+        {
+          "from": [
+            "Slab Width",
+            "Value"
+          ],
+          "to": [
+            "Floor Slab",
+            "Socket_0"
+          ]
+        },
+        {
+          "from": [
+            "Slab Depth",
+            "Value"
+          ],
+          "to": [
+            "Floor Slab",
+            "Socket_1"
+          ]
+        },
+        {
+          "from": [
+            "Floor Levels",
+            "Mesh"
+          ],
+          "to": [
+            "Stack Floors",
+            "Points"
+          ]
+        },
+        {
+          "from": [
+            "Floor Slab",
+            "Socket_3"
+          ],
+          "to": [
+            "Stack Floors",
+            "Instance"
+          ]
+        },
+        {
+          "from": [
+            "Stack Floors",
+            "Instances"
+          ],
+          "to": [
+            "Realize Floors",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Normal",
+            "Normal"
+          ],
+          "to": [
+            "Separate XYZ",
+            "Vector"
+          ]
+        },
+        {
+          "from": [
+            "Separate XYZ",
+            "Z"
+          ],
+          "to": [
+            "Facade Facing",
+            "Value"
+          ]
+        },
+        {
+          "from": [
+            "Facade Facing",
+            "Value"
+          ],
+          "to": [
+            "Is Wall",
+            "A"
+          ]
+        },
+        {
+          "from": [
+            "Building Mass",
+            "Mesh"
+          ],
+          "to": [
+            "Window Positions",
+            "Mesh"
+          ]
+        },
+        {
+          "from": [
+            "Is Wall",
+            "Result"
+          ],
+          "to": [
+            "Window Positions",
+            "Selection"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_5"
+          ],
+          "to": [
+            "Window Positions",
+            "Density"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_6"
+          ],
+          "to": [
+            "Window Positions",
+            "Seed"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_6"
+          ],
+          "to": [
+            "Window Variation",
+            "Seed"
+          ]
+        },
+        {
+          "from": [
+            "Window Positions",
+            "Points"
+          ],
+          "to": [
+            "Place Windows",
+            "Points"
+          ]
+        },
+        {
+          "from": [
+            "Window Panel",
+            "Mesh"
+          ],
+          "to": [
+            "Place Windows",
+            "Instance"
+          ]
+        },
+        {
+          "from": [
+            "Window Variation",
+            "Value_001"
+          ],
+          "to": [
+            "Place Windows",
+            "Scale"
+          ]
+        },
+        {
+          "from": [
+            "Place Windows",
+            "Instances"
+          ],
+          "to": [
+            "Realize Windows",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Realize Windows",
+            "Geometry"
+          ],
+          "to": [
+            "Assemble Building",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Realize Floors",
+            "Geometry"
+          ],
+          "to": [
+            "Assemble Building",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Building Mass",
+            "Mesh"
+          ],
+          "to": [
+            "Assemble Building",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Assemble Building",
+            "Geometry"
+          ],
+          "to": [
+            "Concrete",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Concrete",
+            "Geometry"
+          ],
+          "to": [
+            "Group Output",
+            "Socket_7"
+          ]
+        }
+      ],
+      "metadata": {
+        "blender_name": "BuildingGenerator"
+      }
+    },
+    {
+      "name": "FloorSlab",
+      "kind": "geometry",
+      "is_group": true,
+      "interface": [
+        {
+          "identifier": "Socket_3",
+          "name": "Slab",
+          "in_out": "OUTPUT",
+          "type": "geometry"
+        },
+        {
+          "identifier": "Socket_0",
+          "name": "Width",
+          "in_out": "INPUT",
+          "type": "float",
+          "subtype": "DISTANCE",
+          "default": 10.0,
+          "min_value": -3.4028234663852886e+38,
+          "max_value": 3.4028234663852886e+38
+        },
+        {
+          "identifier": "Socket_1",
+          "name": "Depth",
+          "in_out": "INPUT",
+          "type": "float",
+          "subtype": "DISTANCE",
+          "default": 8.0,
+          "min_value": -3.4028234663852886e+38,
+          "max_value": 3.4028234663852886e+38
+        },
+        {
+          "identifier": "Socket_2",
+          "name": "Thickness",
+          "in_out": "INPUT",
+          "type": "float",
+          "subtype": "DISTANCE",
+          "default": 0.25,
+          "min_value": -3.4028234663852886e+38,
+          "max_value": 3.4028234663852886e+38
+        }
+      ],
+      "nodes": [
+        {
+          "id": "Group Input",
+          "type": "NodeGroupInput",
+          "inputs": [],
+          "outputs": [
+            {
+              "identifier": "Socket_0",
+              "name": "Width",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 10.0,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_1",
+              "name": "Depth",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 8.0,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_2",
+              "name": "Thickness",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 0.25,
+              "linked": true
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Group Output",
+          "type": "NodeGroupOutput",
+          "inputs": [
+            {
+              "identifier": "Socket_3",
+              "name": "Slab",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "outputs": [],
+          "parameters": {
+            "is_active_output": true
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Slab Outline",
+          "type": "GeometryNodeMeshGrid",
+          "inputs": [
+            {
+              "identifier": "Size X",
+              "name": "Size X",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Size Y",
+              "name": "Size Y",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Vertices X",
+              "name": "Vertices X",
+              "type": "int",
+              "default": 2
+            },
+            {
+              "identifier": "Vertices Y",
+              "name": "Vertices Y",
+              "type": "int",
+              "default": 2
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "UV Map",
+              "name": "UV Map",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Slab Thickness",
+          "type": "GeometryNodeExtrudeMesh",
+          "inputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Offset",
+              "name": "Offset",
+              "type": "vector3",
+              "subtype": "TRANSLATION",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Offset Scale",
+              "name": "Offset Scale",
+              "type": "float",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Individual",
+              "name": "Individual",
+              "type": "bool",
+              "default": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Top",
+              "name": "Top",
+              "type": "bool",
+              "default": false
+            },
+            {
+              "identifier": "Side",
+              "name": "Side",
+              "type": "bool",
+              "default": false
+            }
+          ],
+          "parameters": {
+            "mode": "FACES"
+          },
+          "internal_links": [
+            [
+              "Mesh",
+              "Mesh"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": [
+            "Group Input",
+            "Socket_0"
+          ],
+          "to": [
+            "Slab Outline",
+            "Size X"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_1"
+          ],
+          "to": [
+            "Slab Outline",
+            "Size Y"
+          ]
+        },
+        {
+          "from": [
+            "Slab Outline",
+            "Mesh"
+          ],
+          "to": [
+            "Slab Thickness",
+            "Mesh"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_2"
+          ],
+          "to": [
+            "Slab Thickness",
+            "Offset Scale"
+          ]
+        },
+        {
+          "from": [
+            "Slab Thickness",
+            "Mesh"
+          ],
+          "to": [
+            "Group Output",
+            "Socket_3"
+          ]
+        }
+      ],
+      "metadata": {
+        "blender_name": "FloorSlab"
+      }
+    }
+  ]
+}

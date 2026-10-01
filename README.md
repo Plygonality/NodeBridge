@@ -1,217 +1,212 @@
 # NodeBridge
 
-NodeBridge is a **cross-DCC compiler for procedural graphs**.
+**A cross-DCC procedural compiler for Blender.**
 
-A procedural system authored in one supported DCC or game engine should be convertible into an editable native procedural system in another supported application — without requiring the artist to rebuild the graph from scratch.
+Build a procedural system once in Blender. NodeBridge reads the node tree, works out what it *does*, and generates a Python script that rebuilds an equivalent **native, editable** procedural system in **Houdini** or **Unreal Engine 5**. It does not export baked geometry.
 
-**NodeBridge translates procedural semantics, not node names.**
+> **Do not translate node names. Translate procedural meaning.**
+> Source nodes are syntax. NodeBridge's Semantic IR represents meaning. Target backends decide the implementation.
 
+![NodeBridge panel in Blender's Geometry Node editor](docs/images/nodebridge_npanel_houdini.jpg)
+
+*The NodeBridge sidebar in Blender 4.5 after Analyze and Generate on the bundled scatter example.*
+
+---
+
+## What it does
+
+| You build in Blender | NodeBridge generates | You get |
+| --- | --- | --- |
+| Geometry Nodes | Houdini Python (`hou`) | A SOP network in a new `/obj` geo node, with your group inputs as live parameters |
+| Geometry Nodes | Unreal Editor Python | A PCG graph asset (surface sampler, transform points, mesh spawner, ...) |
+| Shader nodes | Houdini Python | A MaterialX network in `/mat` (Karma) |
+| Shader nodes | Unreal Editor Python | A Material asset with Scalar / Vector parameters |
+| Compositor | Houdini Python | A COP2 network in `/img` |
+| Compositor | Unreal Editor Python | An unbound Post Process Volume (bloom, grading, vignette) |
+
+The workflow inside Blender is: **Analyze, Generate, Copy, Paste into the target, Run.**
+
+### Equivalent is not identical
+
+Every translated operation is classified. The report and the panel show the counts, and the generated network carries notes on anything that is not exact.
+
+| Class | Meaning | Example |
+| --- | --- | --- |
+| **EXACT** | The target reproduces the source behaviour to a very high degree. | Transform Geometry becomes an `xform` SOP with converted axes. |
+| **EQUIVALENT** | The procedural intent is preserved; implementation details or samples differ. | Distribute Points on Faces becomes a Scatter SOP: same density, different random positions. |
+| **APPROXIMATE** | The target produces a similar result but not the full behaviour. | Blender's Noise Texture becomes Houdini fractal `noise()`: a similar look, but not the same pattern. |
+| **UNSUPPORTED** | No reliable translation exists yet. A placeholder and a note are generated. Nothing is dropped silently. | Mesh extrusion in Unreal PCG (PCG works on points, not meshes). |
+
+NodeBridge does **not** promise vertex-identical or pixel-identical results between applications. For most systems you get a *semantically equivalent procedural system* that you can keep editing natively.
+
+---
+
+## Install the Blender add-on
+
+Requirements: **Blender 4.2 LTS or newer** (tested on 4.2 LTS and 4.5 LTS). No other dependencies.
+
+1. Get the add-on zip:
+   * download `nodebridge-0.3.0.zip` from the repository's releases, **or**
+   * build it from a checkout with `python tools/build_addon.py`, which writes `dist/nodebridge-0.3.0.zip` (Blender is not needed for the build).
+2. In Blender, open **Edit > Preferences > Get Extensions**.
+3. Click the **⌄** menu in the top-right corner and choose **Install from Disk…**
+4. Select `nodebridge-0.3.0.zip`. NodeBridge is installed and enabled.
+
+You can also drag the zip into the Blender window. Blender itself validates the package (`blender --command extension validate dist/nodebridge-0.3.0.zip`).
+
+## Use it: Blender to Houdini
+
+1. Select an object that has a **Geometry Nodes** modifier, and open the **Geometry Node Editor**.
+   *To try it without your own scene, open Blender's **Scripting** workspace, open `examples/blender/build_examples.py` in the Text Editor, and click **Run Script**. This builds the four example systems.*
+2. Press **N** to open the sidebar, then click the **NodeBridge** tab.
+3. **Source** shows what was detected: `Geometry Nodes`, the tree name, and the object and modifier it belongs to. Leave it on **Auto**, or force Geometry Nodes / Shader / Compositor.
+4. **Target**: choose **Houdini**.
+5. Click **Analyze Graph**. The panel shows the number of nodes analyzed and operations detected, the Exact / Equivalent / Approximate / Unsupported counts, and a warnings list. **Open Report** and **Copy Report** give you the full translation report.
+6. Click **Generate Code**. A preview of the generated *Houdini Python* appears.
+7. Click **Copy Code**. (**Save .py** writes the script to a file instead; **Open** shows it in Blender's Text Editor.)
+8. In Houdini, open **Windows > Python Source Editor**, paste the code, and click **Apply**. You can also paste it into **Windows > Python Shell**.
+9. A new geo node such as `/obj/nb_scatter_rocks` appears, containing a native SOP network. Your Blender group inputs (Density, Seed, ...) are on that node's **NodeBridge** parameter tab and drive the SOPs through channel references.
+10. If the Blender modifier used the object's own mesh, the network starts from a placeholder grid sized like the Blender object. Point the **Object Merge** at your object, then enable **Use Source Object** on the geo node.
+
+Equivalent and approximate operations are marked with sticky notes in the network. Any SOP parameter that your Houdini version names differently is printed as a `NodeBridge warning:` line instead of stopping the script.
+
+## Use it: Blender to Unreal Engine 5
+
+Steps 1 to 7 are the same, with **Target** set to **Unreal Engine 5**. Then:
+
+1. Enable the **Python Editor Script Plugin**, and for Geometry Nodes also the **PCG** plugin.
+2. Click **Save .py** in Blender. In Unreal, choose **Tools > Execute Python Script…** and pick the file. (Pasting into the Output Log's Python console also works where your editor version accepts multi-line input.)
+3. A new asset appears under `/Game/NodeBridge`: `PCG_<Name>`, `M_<Name>`, or, for compositor trees, a Post Process Volume in the level. Existing assets are never overwritten.
+4. Exposed Blender parameters appear as named **controls** at the top of the script (for example `DENSITY = 4.0`). Edit them and run the script again. Values derived from them stay expressions such as `FLOORS * FLOOR_HEIGHT`.
+5. Set `SPAWN_PCG_VOLUME = True` at the top of the script to also place a PCG Volume that uses the new graph.
+
+The PCG Python API is experimental (UE 5.4+). Generated scripts only call documented editor APIs. Anything your editor version does not expose is logged as a `NodeBridge:` warning instead of being faked.
+
+---
+
+## What the generated code looks like
+
+Generated scripts are meant to be read and maintained: one block per operation, the source node named in a comment, readable VEX, and no destructive changes to existing scene content.
+
+```python
+# Scatter Rocks: SCATTER [EQUIVALENT] -> scatter SOP  (Blender: GeometryNodeDistributePointsOnFaces)
+scatter_rocks = nb_create(geo, "scatter", "scatter_rocks")
+scatter_rocks.setInput(0, in_geometry)
+nb_set(scatter_rocks, "forcetotal", 0)
+nb_expr(scatter_rocks, "densityscale", 'ch("../density")')
+nb_expr(scatter_rocks, "seed", 'int(ch("../seed"))')
 ```
-                         NodeBridge
-                    Semantic Compiler
 
-                           IR
-                           │
-                ┌──────────┼──────────┐
-                │          │          │
-             Blender    Houdini     Unreal
-                ↕          ↕          ↕
-               GN        SOP/VEX      PCG
+```python
+# Random Scale: RANDOM_TRANSFORM [EQUIVALENT] -> PCGTransformPointsSettings
+random_scale, random_scale_settings = nb_pcg_node(graph, "PCGTransformPointsSettings", 1200, 0)
+nb_edge(graph, remove_sparse_areas_geometry_filter, ['Out'], random_scale, ['In'])
+nb_prop(random_scale_settings, "uniform_scale", True)
+nb_prop(random_scale_settings, "scale_min", unreal.Vector(SCALE_MIN, SCALE_MIN, SCALE_MIN))
 ```
 
-Each host can operate as a frontend (native → IR), a backend (IR → native), or both.
-
-## Why this is hard
-
-Geometry Nodes, Houdini SOPs, and Unreal PCG do not share a node catalog. A Blender *Distribute Points on Faces* node is not a Houdini *Scatter* node and is not an Unreal *Surface Sampler*. They sometimes describe related ideas — sample a surface, produce points — and sometimes they do not.
-
-Pairwise converters (`Blender → Houdini`, `Houdini → Unreal`, …) do not scale, and they encode the false assumption that one source node equals one target node.
-
-NodeBridge instead compiles:
-
-```
-Native DCC graph
-    → frontend / source adapter
-    → canonical semantic IR
-    → analysis + normalization + rewrite + lowering
-    → target backend
-    → editable native DCC graph
-```
-
-Future hosts (Maya/Bifrost, Substance Designer, Nuke, …) should plug in through the host contract, not by editing every compiler module.
-
-## What NodeBridge is
-
-* A software-independent procedural graph compiler
-* A canonical semantic IR for operations, data flow, types, and provenance
-* A registry of semantic operations that can grow incrementally
-* A host plugin architecture (frontend + backend + capabilities)
-* A translation planner that classifies every operation before generation
-* Structured fidelity: `EXACT`, `LOWERED`, `APPROXIMATE`, `CUSTOM_CODE`, `BAKED`, `UNSUPPORTED`
-
-## What NodeBridge is not
-
-* A Blender exporter that string-replaces node names
-* A collection of pairwise converters
-* A requirement that graph topology survives translation
-* A live IPC bridge between running applications
-* A tool that silently approximates unsupported behavior
-* A promise of perfect round-trip equivalence
-
-## Current status (implemented today)
-
-**Version 0.2** implements the many-to-many compiler architecture and a Blender ↔ Houdini vertical slice at the **pure translation / construction-plan** level.
-
-| Layer | Status |
+| Generated Houdini Python | Translation report |
 | --- | --- |
-| Canonical semantic IR | Implemented |
-| Type system | Implemented |
-| Semantic operation catalog (narrow) | Implemented |
-| Validation + JSON serialization | Implemented |
-| Host plugin registry | Implemented |
-| Capability model | Implemented |
-| Compiler pipeline (validate → normalize → plan → lower → report) | Implemented |
-| Blender Geometry Nodes frontend | Implemented for a small subset, fixture/duck-typed trees |
-| Blender Geometry Nodes backend | Implemented as construction plans + bpy script text |
-| Houdini SOP frontend | Implemented for a small subset, fixture/duck-typed networks |
-| Houdini SOP backend | Implemented as construction plans + hou script text + VEX snippets |
-| Unreal PCG frontend | Architecture + fixtures; live `unreal` inspection is experimental |
-| Unreal PCG backend | Construction plans + experimental UE 5.7 Python text |
-| Live `bpy` / `hou` / `unreal` execution | Not run in CI; optional runtime modules use importlib |
-| Blender add-on UI | Scaffold only |
+| ![Generated Houdini script in Blender's Text Editor](docs/images/nodebridge_generated_houdini_code.jpg) | ![Translation report](docs/images/nodebridge_analysis_report.jpg) |
+| **Unreal target (PCG)** | **Shader to Unreal Material** |
+| ![Panel with Unreal target](docs/images/nodebridge_npanel_unreal.jpg) | ![Shader editor with Unreal target](docs/images/nodebridge_shader_unreal.jpg) |
 
-The core package imports without Blender, Houdini, or Unreal installed.
+Complete generated scripts and expected reports for all four examples are in [`examples/`](examples/):
 
-**Not implemented today:** live editor integration, a large node catalog, shader/compositor coverage, baking evaluators, Maya/Substance/Nuke hosts, and perfect round-trips.
+| Example | Blender system | Houdini | Unreal |
+| --- | --- | --- | --- |
+| [Scatter](examples/scatter/) | ground plane, Distribute Points on Faces, noise coverage mask, random scale and rotation, instanced rocks with a material | 10 exact, 9 equivalent, 2 approximate, 0 unsupported | 4 / 9 / 8 / 0 |
+| [Building](examples/building/) | grid footprint, extruded mass, floor slabs stacked from a nested node group, randomized windows on walls | 21 / 3 / 0 / 0 | 4 / 3 / 5 / 11 (PCG has no mesh modelling) |
+| [Shader](examples/shader/) | noise, color ramp, roughness modulation, bump, a labeled Value node as a parameter | 4 / 3 / 1 / 0 | 4 / 2 / 2 / 0 |
+| [Compositor](examples/compositor/) | render layer, glare, color balance, vignette (ellipse mask + blur + multiply), composite | 0 / 1 / 2 / 2 | 0 / 2 / 3 / 0 |
 
-## Supported hosts
+---
 
-| Host | Graph system | Frontend | Backend | Runtime API |
-| --- | --- | --- | --- | --- |
-| Blender | Geometry Nodes | Yes (fixtures + optional bpy) | Yes (plan + bpy script) | Optional, Blender only |
-| Houdini | SOP / VEX | Yes (fixtures + optional hou) | Yes (plan + hou script) | Optional, Houdini only |
-| Unreal Engine 5 | PCG | Yes (fixtures; live inspect limited) | Yes (plan + experimental Python) | Editor-only, UE 5.7+ experimental |
+## How it works
 
-## Supported semantic operations (vertical slice)
+```mermaid
+flowchart LR
+    tree[Blender node tree] --> parser[Blender parser]
+    parser --> graphIR[Graph IR]
+    graphIR --> normalize["Normalize: reroutes, mutes, dead nodes"]
+    normalize --> lift["Lift: node syntax to semantic ops"]
+    lift --> semanticIR[Semantic IR]
+    semanticIR --> rewrite["Rewrite rules: RandomTransform, SpatialNoiseMask, folding"]
+    rewrite --> capability["Capability resolver: EXACT ... UNSUPPORTED"]
+    capability --> houdini[Houdini backend]
+    capability --> unreal[Unreal backend]
+    houdini --> hcode[Houdini Python]
+    unreal --> ucode[Unreal Editor Python]
+```
 
-The catalog is larger than the well-tested slice. The slice with cross-host mappings is approximately:
+* **Graph IR** keeps the source structure: nodes, sockets, links, defaults, interfaces, nested groups and modifier values.
+* **Semantic IR** says what the graph does: `SCATTER`, `INSTANCE`, `RANDOM_TRANSFORM`, `NOISE`, `MAP_RANGE`, ... The Blender node types are kept only as provenance.
+* **Rewrite rules** recognize multi-node idioms. For example, *Distribute Points → Instance on Points → Rotate Instances with a random value* becomes *Scatter → RandomTransform → Instance*, which maps directly onto Houdini point attributes and onto Unreal's Transform Points ranges.
+* **Backends** register translators per operation. Each translator carries its confidence, implementation and limitations, and the [support matrix](docs/support_matrix.md) is generated from that metadata.
+* **Fields** have no SOP equivalent, so they are compiled to VEX in Attribute Wrangles. The VEX is evaluated in Blender's Z-up frame, with explicit conversion at the boundary.
+* **Centralized conversion layers** handle coordinate systems (handedness, up axis, Euler orders, Unreal rotators, UV origin, normal-map convention), units (meters to Unreal centimeters, radians to degrees, frames) and **deterministic randomness** (`random(seed, id)`, identical in Python and VEX).
 
-* `graph.input` / `graph.output`
-* `geometry.primitive`
-* `geometry.transform`
-* `geometry.join`
-* `points.distribute` (surface sampling)
-* `random.float` / `random.vector`
-* `geometry.instance`
-* `geometry.realize_instances`
-* `math.*` (add, subtract, multiply, divide, min, max, clamp, map_range)
-* `vector.*` (add, subtract, scale, normalize, dot, cross, distance)
-* `attribute.read` / `attribute.write`
+Read [docs/architecture.md](docs/architecture.md) for the full design.
 
-See [docs/semantic_operations.md](docs/semantic_operations.md) and [docs/compatibility.md](docs/compatibility.md).
+---
 
-## Installation
+## Current support
 
-Requires Python 3.11+.
+The real current lists are generated from code: [docs/support_matrix.md](docs/support_matrix.md) (every semantic operation against every target).
+
+**Blender nodes lifted to semantic operations**
+
+* **Geometry Nodes:** Group Input/Output, nested node groups, Join Geometry, Transform Geometry, Set Position, Position, Normal, Index, ID, Value / Integer / Boolean / Vector / Color / String inputs, Math, Vector Math, Clamp, Float to Integer, Map Range, Compare, Boolean Math, Switch, Mix, Color Ramp, Combine/Separate XYZ, Noise Texture, Voronoi Texture, Random Value, Distribute Points on Faces, Instance on Points, Realize Instances, Rotate/Scale/Translate Instances, Set Material, Mesh Cube/Grid/UV Sphere/Ico Sphere/Cylinder/Cone/Line/Circle, Curve Line/Circle/Spiral, Curve to Mesh, Resample Curve, Mesh to Curve, Mesh to Points, Extrude Mesh, Subdivide Mesh, Subdivision Surface, Delete Geometry, Separate Geometry, Mesh Boolean, Geometry Proximity, Raycast, Object Info, Collection Info, Named Attribute, Store Named Attribute, Align Euler/Rotation to Vector. Simulation, Repeat and For Each zones are reported as unsupported.
+* **Shader:** Material Output, Principled BSDF, Diffuse BSDF, Emission, Mix/Add Shader, Image Texture, Texture Coordinate, UV Map, Geometry, Mapping, Bump, Normal Map, Noise, Voronoi, Gradient/Checker/Wave, Color Ramp, Math, Vector Math, Mix, Map Range, Clamp, Invert, Hue/Saturation, Gamma, Bright/Contrast, RGB to BW, Separate/Combine Color, Value and RGB (labeled ones become parameters).
+* **Compositor:** Render Layers, Image, Composite, Viewer, Glare, Color Balance, Ellipse Mask, Blur, Mix, Bright/Contrast, Hue/Saturation, Gamma, Exposure, Lens Distortion, Invert, RGB, Value, Math.
+
+Any other node becomes an `UNSUPPORTED_OPERATION`: it is reported, and a placeholder keeps the target network connected.
+
+---
+
+## What has been verified, and what has not
+
+* **Blender side (verified):** the parser, the add-on UI, the operators and the extension package were run in real **Blender 4.2.23 LTS and 4.5.14 LTS**, both in background and in the GUI. The clipboard copy was checked against the system clipboard. Node socket identifiers and properties were probed in both versions.
+* **Generated code (structurally verified):** every generated Houdini and Unreal script is parsed, then executed against recording stand-ins for `hou` and `unreal` (in `tests/fakes/`). Those stand-ins check call shapes, wiring and pin labels.
+* **Not yet verified in a live Houdini or Unreal session.** No Houdini or Unreal licence was available while building 0.3. API usage follows the documented `hou` and Unreal Python APIs, and version-sensitive calls are guarded. Some SOP / COP2 parameter names and Unreal PCG property names may differ in your version: the script reports them as warnings instead of failing. Running the four examples in real Houdini 20.x and Unreal 5.4+ is the top item on the [roadmap](docs/roadmap.md).
+* **Randomness:** the NodeBridge hash is identical in Python and VEX. The test suite compiles the generated VEX library as C and compares it with Python. Blender's own random sequence is not reproduced, so random-dependent operations are classified EQUIVALENT.
+
+## Known limitations
+
+* PCG works on point data. Mesh modelling operations (extrude, booleans, curves, subdivision) and arbitrary per-point field expressions are UNSUPPORTED on Unreal. Instance geometry becomes an engine basic shape or a named Static Mesh asset.
+* Exposed parameters are live Houdini spare parameters. On Unreal they are script-level controls (PCG graph parameters cannot be created reliably from Python yet). Material parameters are real Material parameters.
+* Node groups become Houdini subnets with promoted parameters, unless fields cross the group boundary (then they are inlined). On Unreal, groups are inlined.
+* Noise and Voronoi patterns differ numerically from Blender's (APPROXIMATE).
+* Simulation, Repeat and For Each zones, matrix sockets, menu switches, edge-domain attributes, volume shading and displacement are not translated.
+* Houdini compositing targets COP2, not Houdini 20.5's Copernicus. Unreal compositing is limited to Post Process Volume settings.
+
+---
+
+## Command line and development
+
+The compiler is pure Python (3.11+) with no dependencies, and it never imports `bpy` outside the add-on.
 
 ```bash
 python -m pip install -e ".[dev]"
+python -m pytest                                    # 85 tests; Blender tests are skipped
+NODEBRIDGE_BLENDER=/path/to/blender python -m pytest tests/test_blender_integration.py
+
+nodebridge analyze  examples/scatter/scatter.graph.json --target houdini
+nodebridge generate examples/scatter/scatter.graph.json --target unreal -o scatter_unreal.py
+nodebridge capabilities --markdown
 ```
 
-## Basic usage
+Graph IR fixtures are exported from Blender with the add-on's **Advanced > Debug Output** option, or with `tests/blender/run_in_blender.py --export-fixtures DIR`. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add operations, lifters, translators and backends.
 
-Build IR without any DCC installed:
+NodeBridge works without any AI service. An optional `TranslationFallbackProvider` interface exists for future suggestion tools. Its output only appears as a suggestion in the report and is never executed (default: `None`).
 
-```python
-from nodebridge import GraphBuilder, GraphSystem, DataType, compile_graph, dumps, validate_graph
+## Documentation
 
-builder = GraphBuilder(name="example", system=GraphSystem.GEOMETRY)
-add = builder.node("math.add")
-builder.input(add, "a", DataType.FLOAT, default=1.0)
-builder.input(add, "b", DataType.FLOAT, default=2.0)
-builder.output(add, "value", DataType.FLOAT)
-
-assert validate_graph(builder.graph).ok
-json_text = dumps(builder.graph)
-
-result = compile_graph(builder.graph, "houdini")
-print(result.report.format_text())
-print(result.native_graph.nodes[0].type)  # attribwrangle for math.add
-```
-
-Compile a native Blender fixture toward Houdini:
-
-```python
-from nodebridge import compile_native
-from nodebridge.hosts.blender import BlenderFrontend
-
-# native_graph is a NativeGraph or dict describing Geometry Nodes
-document = BlenderFrontend().extract(native_graph)
-result = compile_native(native_graph, "houdini")
-```
-
-CLI:
-
-```bash
-nodebridge inspect graph.nodebridge.json
-nodebridge validate graph.nodebridge.json
-nodebridge capabilities houdini
-nodebridge plan graph.nodebridge.json --target houdini
-nodebridge report graph.nodebridge.json --target unreal
-nodebridge translate graph.nodebridge.json --target houdini --output houdini.native.json --script houdini_build.py
-nodebridge translate --source blender --target houdini --input scatter.native.json
-```
-
-`.nodebridge.json` files are data. Loading them never executes Python, VEX, or Unreal scripts. Generation and execution are explicit stages.
-
-## Architecture
-
-```
-Native graph  →  Host frontend  →  Semantic IR  →  Compiler passes
-                                                      │
-                                                      ▼
-Native graph  ←  Host backend   ←  Lowering / plan  ←─┘
-```
-
-* **IR** names operations such as `points.distribute`, not `GeometryNodeDistributePointsOnFaces`.
-* **Frontends** map native constructs onto those operations and store host types as provenance.
-* **Backends** lower operations to native fragments. One IR node may become several target nodes.
-* **Fidelity** is always classified. Approximations and gaps are diagnostics, not silent substitutions.
-
-See [docs/architecture.md](docs/architecture.md) and [docs/translation_pipeline.md](docs/translation_pipeline.md).
-
-## Example workflow
-
-1. Author a Geometry Nodes scattering tree in Blender (or describe it as a native fixture).
-2. Extract it to NodeBridge IR (`points.distribute` → `random.vector` → `geometry.instance` → `geometry.realize_instances`).
-3. Plan translation toward Houdini.
-4. Generate a SOP construction plan (Scatter, Attribute Randomize, Copy to Points, Unpack).
-5. Optionally emit a `hou` script to rebuild an editable network inside Houdini.
-6. Read the translation report for anything that was lowered, approximated, implemented as VEX, or unsupported.
-
-The inverse path (Houdini SOP fixture → IR → Blender Geometry Nodes plan) is implemented for the same subset.
-
-The graphs do not need identical topology. The goal is **procedural semantic equivalence** within documented fidelity, not node-name or wiring identity.
-
-## Limitations
-
-* The operation catalog is a coherent seed, not Geometry Nodes / SOP / PCG coverage.
-* Live DCC execution is optional and environment-dependent. CI tests use host-neutral fixtures.
-* Unreal PCG Python is experimental (UE 5.7+ `add_node_of_type` / `add_edge`). Pin inspection is incomplete. NodeBridge emits plans and documented script text; it does not pretend unsupported editor APIs exist.
-* Nested groups are represented but not fully lowered.
-* Field-evaluation differences between applications are recorded, not solved.
-* Baking is a classified fallback, not an implemented evaluator.
-* The Blender add-on is a UI shell only.
-
-## Roadmap
-
-See [docs/roadmap.md](docs/roadmap.md). Next highest-leverage work: run the Blender ↔ Houdini slice against real `bpy` / `hou` sessions for the scattering subset.
-
-## Tests
-
-```bash
-python -m pytest
-```
+* [Architecture](docs/architecture.md)
+* [Support matrix](docs/support_matrix.md) (generated)
+* [Roadmap](docs/roadmap.md)
+* [Repository audit for the 0.3 rebuild](docs/audit.md)
+* [Contributing](CONTRIBUTING.md)
 
 ## License
 

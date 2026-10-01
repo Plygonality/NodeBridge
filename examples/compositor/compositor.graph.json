@@ -1,0 +1,796 @@
+{
+  "format": "nodebridge.graph",
+  "format_version": 1,
+  "nodebridge_version": "0.3.0",
+  "root": "Scene Compositor",
+  "source": {
+    "application": "Blender 4.2.23 LTS",
+    "display_name": "Scene Compositor",
+    "unit_scale": 1.0,
+    "fps": 24.0,
+    "scene": "Scene",
+    "tree_kind": "compositor",
+    "tree": "Compositing Nodetree"
+  },
+  "trees": [
+    {
+      "name": "Scene Compositor",
+      "kind": "compositor",
+      "is_group": false,
+      "interface": [],
+      "nodes": [
+        {
+          "id": "Render Layers",
+          "type": "CompositorNodeRLayers",
+          "inputs": [],
+          "outputs": [
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Alpha",
+              "name": "Alpha",
+              "type": "float",
+              "default": 1.0
+            },
+            {
+              "identifier": "Depth",
+              "name": "Depth",
+              "type": "float",
+              "default": 1.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Normal",
+              "name": "Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "UV",
+              "name": "UV",
+              "type": "vector3",
+              "default": [
+                1.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                1.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Position",
+              "name": "Position",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Deprecated",
+              "name": "Deprecated",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Deprecated_001",
+              "name": "Deprecated",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Shadow",
+              "name": "Shadow",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "AO",
+              "name": "AO",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Deprecated_002",
+              "name": "Deprecated",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Deprecated_003",
+              "name": "Deprecated",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Deprecated_004",
+              "name": "Deprecated",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "IndexOB",
+              "name": "IndexOB",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "IndexMA",
+              "name": "IndexMA",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Mist",
+              "name": "Mist",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Emit",
+              "name": "Emit",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Env",
+              "name": "Env",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "DiffDir",
+              "name": "DiffDir",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "DiffInd",
+              "name": "DiffInd",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "DiffCol",
+              "name": "DiffCol",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "GlossDir",
+              "name": "GlossDir",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "GlossInd",
+              "name": "GlossInd",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "GlossCol",
+              "name": "GlossCol",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "TransDir",
+              "name": "TransDir",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "TransInd",
+              "name": "TransInd",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "TransCol",
+              "name": "TransCol",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "SubsurfaceDir",
+              "name": "SubsurfaceDir",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "SubsurfaceInd",
+              "name": "SubsurfaceInd",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "SubsurfaceCol",
+              "name": "SubsurfaceCol",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            }
+          ],
+          "parameters": {
+            "scene": {
+              "id_type": "Scene",
+              "name": "Scene"
+            },
+            "layer": "ViewLayer"
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Bloom",
+          "type": "CompositorNodeGlare",
+          "label": "Bloom",
+          "inputs": [
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "glare_type": "FOG_GLOW",
+            "quality": "HIGH",
+            "iterations": 3,
+            "color_modulation": 0.25,
+            "mix": 0.0,
+            "threshold": 0.8,
+            "streaks": 4,
+            "angle_offset": 0.0,
+            "fade": 0.9,
+            "use_rotate_45": true,
+            "size": 8
+          },
+          "internal_links": [
+            [
+              "Image",
+              "Image"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Grade",
+          "type": "CompositorNodeColorBalance",
+          "label": "Grade",
+          "inputs": [
+            {
+              "identifier": "Fac",
+              "name": "Fac",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 1.0
+            },
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "correction_method": "LIFT_GAMMA_GAIN",
+            "lift": [
+              0.98,
+              1.0,
+              1.04
+            ],
+            "gamma": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "gain": [
+              1.05,
+              1.0,
+              0.92
+            ],
+            "offset": [
+              -0.021,
+              0.0,
+              0.0368
+            ],
+            "power": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "slope": [
+              1.071,
+              1.0,
+              0.8832
+            ],
+            "offset_basis": 0.0
+          },
+          "internal_links": [
+            [
+              "Image",
+              "Image"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Vignette Shape",
+          "type": "CompositorNodeEllipseMask",
+          "inputs": [
+            {
+              "identifier": "Mask",
+              "name": "Mask",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 1.0
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Mask",
+              "name": "Mask",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "mask_type": "ADD",
+            "x": 0.5,
+            "y": 0.5,
+            "mask_width": 0.9,
+            "mask_height": 0.75,
+            "rotation": 0.0
+          },
+          "internal_links": [
+            [
+              "Mask",
+              "Mask"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Vignette Softness",
+          "type": "CompositorNodeBlur",
+          "inputs": [
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Size",
+              "name": "Size",
+              "type": "float",
+              "default": 1.0
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "use_variable_size": false,
+            "use_extended_bounds": false,
+            "size_x": 200,
+            "size_y": 200,
+            "use_relative": false,
+            "aspect_correction": "NONE",
+            "factor": 0.0,
+            "factor_x": 0.0,
+            "factor_y": 0.0,
+            "filter_type": "GAUSS",
+            "use_bokeh": false,
+            "use_gamma_correction": false
+          },
+          "internal_links": [
+            [
+              "Image",
+              "Image"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Vignette",
+          "type": "CompositorNodeMixRGB",
+          "label": "Vignette",
+          "inputs": [
+            {
+              "identifier": "Fac",
+              "name": "Fac",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.6
+            },
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Image_001",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "blend_type": "MULTIPLY",
+            "use_alpha": false,
+            "use_clamp": false
+          },
+          "internal_links": [
+            [
+              "Image",
+              "Image"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Composite",
+          "type": "CompositorNodeComposite",
+          "inputs": [
+            {
+              "identifier": "Image",
+              "name": "Image",
+              "type": "color",
+              "default": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Alpha",
+              "name": "Alpha",
+              "type": "float",
+              "default": 1.0
+            }
+          ],
+          "outputs": [],
+          "parameters": {
+            "use_alpha": true
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": [
+            "Render Layers",
+            "Image"
+          ],
+          "to": [
+            "Bloom",
+            "Image"
+          ]
+        },
+        {
+          "from": [
+            "Bloom",
+            "Image"
+          ],
+          "to": [
+            "Grade",
+            "Image"
+          ]
+        },
+        {
+          "from": [
+            "Vignette Shape",
+            "Mask"
+          ],
+          "to": [
+            "Vignette Softness",
+            "Image"
+          ]
+        },
+        {
+          "from": [
+            "Grade",
+            "Image"
+          ],
+          "to": [
+            "Vignette",
+            "Image"
+          ]
+        },
+        {
+          "from": [
+            "Vignette Softness",
+            "Image"
+          ],
+          "to": [
+            "Vignette",
+            "Image_001"
+          ]
+        },
+        {
+          "from": [
+            "Vignette",
+            "Image"
+          ],
+          "to": [
+            "Composite",
+            "Image"
+          ]
+        }
+      ],
+      "metadata": {
+        "blender_name": "Compositing Nodetree"
+      }
+    }
+  ]
+}

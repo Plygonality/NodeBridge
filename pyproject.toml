@@ -4,25 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nodebridge"
-version = "0.2.0"
-description = "Cross-DCC compiler for procedural graphs"
+version = "0.3.0"
+description = "Cross-DCC procedural compiler: Blender node trees to native Houdini and Unreal Engine 5 code"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "NodeBridge Contributors" }]
-keywords = [
-    "blender",
-    "houdini",
-    "unreal",
-    "pcg",
-    "procedural",
-    "geometry-nodes",
-    "compiler",
-    "intermediate-representation",
-]
+keywords = ["blender", "houdini", "unreal", "pcg", "geometry-nodes", "procedural", "compiler", "blender-addon"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -35,7 +27,7 @@ dependencies = []
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-nodebridge = "nodebridge.cli.main:main"
+nodebridge = "nodebridge.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/Plygonality/NodeBridge"
@@ -44,9 +36,9 @@ Homepage = "https://github.com/Plygonality/NodeBridge"
 where = ["src"]
 
 [tool.setuptools.package-data]
-nodebridge = ["py.typed"]
+nodebridge = ["blender_manifest.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "."]
+pythonpath = ["src", "tests"]
 addopts = "-q"

@@ -1,0 +1,50 @@
+NodeBridge Translation Report
+=============================
+
+Source:
+    Compositor / Scene Compositor  (Blender 4.2.23 LTS)
+Target:
+    Houdini (COP2 network in /img)
+
+7 source nodes
+5 semantic operations
+
+✓ EXACT:        0
+≈ EQUIVALENT:   1
+~ APPROXIMATE:  2
+✕ UNSUPPORTED:  2
+
+Operations:
+  ~ APPROXIMATE Render Layers  RENDER_LAYER         -> file COP
+  ✕ UNSUPPORTED Bloom          GLARE                -> placeholder
+  ~ APPROXIMATE Grade          COLOR_BALANCE        -> colorcorrect COP
+  ✕ UNSUPPORTED Vignette       VIGNETTE             -> placeholder
+  ≈ EQUIVALENT  Composite      COMPOSITE_OUTPUT     -> null OUT (display)
+
+Unsupported:
+  Bloom (CompositorNodeGlare)
+    Reason: No NodeBridge translation is implemented for this operation on this target.
+    Fallback: A placeholder node with a note is generated so the network stays connected.
+  Vignette (CompositorNodeMixRGB, CompositorNodeEllipseMask, CompositorNodeBlur)
+    Reason: No NodeBridge translation is implemented for this operation on this target.
+    Fallback: A placeholder node with a note is generated so the network stays connected.
+
+Approximations:
+  Render Layers (CompositorNodeRLayers)
+    Reason: A rendered image is read from disk; Houdini has no Blender view layer.
+    - Point the File COP at your rendered frames.
+    - COP2 parameter names are not verified against a live Houdini session.
+  Grade (CompositorNodeColorBalance)
+    Reason: Lift / gamma / gain mapped onto Color Correct.
+    - Blender's lift formula differs from COP2's.
+    - COP2 parameter names are not verified against a live Houdini session.
+
+Equivalent (intent preserved, details differ):
+  Composite (CompositorNodeComposite)
+    Reason: Final composite marked with the display flag.
+    - COP2 parameter names are not verified against a live Houdini session.
+
+Compiler notes:
+  - Recognized Ellipse Mask -> Blur -> Multiply as a Vignette (Vignette)
+
+NodeBridge reproduces procedural intent. Unless an operation is EXACT, expect a semantically equivalent system, not vertex- or pixel-identical output.

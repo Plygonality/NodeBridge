@@ -1,63 +1,37 @@
-"""NodeBridge — a cross-DCC compiler for procedural graphs.
+"""NodeBridge: a cross-DCC procedural compiler.
 
-NodeBridge translates procedural *semantics* between applications. It does
-not merely rename nodes. Importing this package does not require Blender,
-Houdini, or Unreal Python.
+NodeBridge reads procedural node trees in Blender, translates their
+procedural intent through a typed intermediate representation, and
+generates code that builds a native procedural system in another DCC.
+
+This package is both a pure-Python library and a Blender add-on. The
+compiler never imports ``bpy``; only ``nodebridge.addon`` and
+``nodebridge.frontend.blender.context`` touch the Blender API, and only
+when Blender loads the add-on. All internal imports are relative so the
+package works as a Blender 4.2+ extension (``bl_ext.*.nodebridge``), as a
+legacy add-on, and as a normal Python package.
 """
 
-from nodebridge.compiler.pipeline import CompilationResult, compile_graph, compile_native
-from nodebridge.compiler.planning import TranslationPlan, plan_translation
-from nodebridge.core.diagnostics import (
-    Diagnostic,
-    TranslationReport,
-    TranslationStatus,
-)
-from nodebridge.core.graph import GraphBuilder, GraphSystem, IRGraph
-from nodebridge.core.link import IRConnection
-from nodebridge.core.node import IRNode, IRParameter
-from nodebridge.core.socket import IRSocket
-from nodebridge.core.types import DataType, TypeRef
-from nodebridge.hosts import get_host, list_hosts, register_host
-from nodebridge.hosts.native import NativeGraph
-from nodebridge.ir.deserializer import deserialize_document, load, loads
-from nodebridge.ir.schema import IRDocument
-from nodebridge.ir.serializer import dump, dumps, serialize_graph
-from nodebridge.ir.validation import validate_graph
-from nodebridge.ir.versioning import IR_VERSION, PACKAGE_VERSION
+__version__ = "0.3.0"
 
-__version__ = PACKAGE_VERSION
+bl_info = {
+    "name": "NodeBridge",
+    "author": "NodeBridge Contributors",
+    "version": (0, 3, 0),
+    "blender": (4, 2, 0),
+    "location": "Node Editor > Sidebar (N) > NodeBridge",
+    "description": "Compile Geometry, Shader and Compositor node trees into native Houdini or Unreal Engine 5 code.",
+    "category": "Node",
+}
 
-__all__ = [
-    "IR_VERSION",
-    "PACKAGE_VERSION",
-    "CompilationResult",
-    "DataType",
-    "Diagnostic",
-    "GraphBuilder",
-    "GraphSystem",
-    "IRConnection",
-    "IRDocument",
-    "IRGraph",
-    "IRNode",
-    "IRParameter",
-    "IRSocket",
-    "NativeGraph",
-    "TranslationPlan",
-    "TranslationReport",
-    "TranslationStatus",
-    "TypeRef",
-    "__version__",
-    "compile_graph",
-    "compile_native",
-    "deserialize_document",
-    "dump",
-    "dumps",
-    "get_host",
-    "list_hosts",
-    "load",
-    "loads",
-    "plan_translation",
-    "register_host",
-    "serialize_graph",
-    "validate_graph",
-]
+
+def register() -> None:
+    from . import addon
+
+    addon.register()
+
+
+def unregister() -> None:
+    from . import addon
+
+    addon.unregister()

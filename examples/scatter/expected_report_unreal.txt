@@ -1,0 +1,103 @@
+NodeBridge Translation Report
+=============================
+
+Source:
+    Geometry Nodes / ScatterRocks  (Blender 4.2.23 LTS)
+Target:
+    Unreal Engine 5 (PCG graph)
+
+25 source nodes
+21 semantic operations
+
+✓ EXACT:        4
+≈ EQUIVALENT:   9
+~ APPROXIMATE:  8
+✕ UNSUPPORTED:  0
+
+Operations:
+  ≈ EQUIVALENT  Geometry                                    GEOMETRY_INPUT       -> PCG graph Input node
+  ~ APPROXIMATE Rock Shape                                  PRIMITIVE            -> Engine basic shape
+  ≈ EQUIVALENT  Scatter Rocks                               SCATTER              -> PCGSurfaceSamplerSettings
+  ~ APPROXIMATE Coverage Noise                              SPATIAL_NOISE_MASK   -> folded into Spatial Noise + Density Filter
+  ~ APPROXIMATE Sink Rock                                   TRANSFORM            -> Transform Points scale
+  ~ APPROXIMATE Remove Sparse Areas                         DELETE_GEOMETRY      -> PCGSpatialNoiseSettings + PCGDensityFilterSettings
+  ≈ EQUIVALENT  Rock Material                               MATERIAL_ASSIGNMENT  -> Static Mesh Spawner override material
+  ≈ EQUIVALENT  Random Scale                                RANDOM_TRANSFORM     -> PCGTransformPointsSettings
+  ≈ EQUIVALENT  Random Rotation                             RANDOM_TRANSFORM     -> PCGTransformPointsSettings
+  ~ APPROXIMATE Place Rocks                                 INSTANCE             -> PCGStaticMeshSpawnerSettings
+  ~ APPROXIMATE Realize Instances                           REALIZE_INSTANCES    -> none (pass-through)
+  ≈ EQUIVALENT  Join Geometry                               MERGE                -> PCGMergeSettings
+  ≈ EQUIVALENT  Geometry                                    GEOMETRY_OUTPUT      -> PCG graph Output node
+  ≈ EQUIVALENT  [ProceduralRock] Texture Coordinate Object  FIELD_INPUT          -> TextureCoordinate / LocalPosition / WorldPosition / VertexNormalWS
+  ✓ EXACT       [ProceduralRock] Mapping                    MAPPING              -> Multiply + Add
+  ~ APPROXIMATE [ProceduralRock] Rock Noise                 NOISE                -> MaterialExpressionNoise
+  ✓ EXACT       [ProceduralRock] Rock Colors                COLOR_RAMP           -> Lerp chain with saturated remaps
+  ✓ EXACT       [ProceduralRock] Roughness Range            MAP_RANGE            -> Subtract / Divide / Lerp
+  ~ APPROXIMATE [ProceduralRock] Rock Bump                  BUMP                 -> DDX/DDY screen-space bump
+  ≈ EQUIVALENT  [ProceduralRock] Principled BSDF            SHADER_BSDF          -> Default Lit material attributes
+  ✓ EXACT       [ProceduralRock] Material Output            MATERIAL_OUTPUT      -> Material output pins
+
+Approximations:
+  Rock Shape (GeometryNodeMeshIcoSphere)
+    Reason: The ico sphere becomes /Engine/BasicShapes/Sphere.Sphere scaled to size.
+    - Mesh resolution and UVs differ.
+  Coverage Noise (FunctionNodeCompare, ShaderNodeTexNoise, ShaderNodeMapRange)
+    Reason: Consumed by the point filter that uses it.
+    - PCG noise is 2D and differs numerically.
+  Sink Rock (GeometryNodeTransform)
+    Reason: Folded into the spawned mesh scale.
+    - Translation and rotation of the instance geometry are dropped.
+  Remove Sparse Areas (GeometryNodeDeleteGeometry)
+    Reason: A noise-driven point deletion becomes PCG Spatial Noise written to density, filtered by the same threshold.
+    - PCG's spatial noise is 2D and numerically different from Blender's noise.
+  Place Rocks (GeometryNodeInstanceOnPoints, GeometryNodeRotateInstances)
+    Reason: Instance on Points becomes a Static Mesh Spawner; mesh primitives map to /Engine/BasicShapes meshes scaled to size.
+    - Geometry Nodes instances arbitrary geometry; PCG spawns Static Mesh assets.
+    - Translation / rotation applied to the instance geometry is dropped; scale is kept.
+  Realize Instances (GeometryNodeRealizeInstances)
+    Reason: PCG spawns instanced static mesh components; there is no 'realize' step.
+    - Spawned meshes stay instances.
+  [ProceduralRock] Rock Noise (ShaderNodeTexNoise)
+    Reason: Blender fBm noise approximated with Unreal's gradient noise expression (output 0..1).
+    - Pattern will not be numerically identical.
+    - Color output reuses the scalar noise.
+  [ProceduralRock] Rock Bump (ShaderNodeBump)
+    Reason: Height-based bump approximated from screen-space derivatives (no height-to-normal expression is constructible from Python).
+    - Bump detail depends on screen resolution; strength is matched only roughly.
+
+Equivalent (intent preserved, details differ):
+  Geometry (NodeGroupInput)
+    Reason: The actor or volume owning the PCG component replaces the modifier object.
+    - Assign the graph to a PCG Volume or a PCG Component on the actor you want to populate.
+  Scatter Rocks (GeometryNodeDistributePointsOnFaces)
+    Reason: Distribute Points on Faces becomes a Surface Sampler with the same density per square meter.
+    - Sample positions differ (different generators).
+  Rock Material (GeometryNodeSetMaterial)
+    Reason: Material assigned as the spawner's override material.
+  Random Scale (FunctionNodeRandomValue, GeometryNodeInstanceOnPoints)
+    Reason: Random rotation / scale ranges become Transform Points min/max ranges.
+    - PCG's random stream differs from Blender's; ranges are preserved.
+    - Euler ranges are mapped per axis to roll / pitch / yaw.
+  Random Rotation (FunctionNodeRandomValue, GeometryNodeRotateInstances)
+    Reason: Random rotation / scale ranges become Transform Points min/max ranges.
+    - PCG's random stream differs from Blender's; ranges are preserved.
+    - Euler ranges are mapped per axis to roll / pitch / yaw.
+  Join Geometry (GeometryNodeJoinGeometry)
+    Reason: Join Geometry becomes Merge Points.
+    - Mesh geometry inputs are not merged; only point data and spawned results flow on.
+  Geometry (NodeGroupOutput)
+    Reason: Final point data / spawned meshes.
+  [ProceduralRock] Texture Coordinate Object (ShaderNodeTexCoord)
+    Reason: Coordinates converted to Blender conventions (UV V flipped; positions in meters, right-handed).
+    - Blender's Generated coordinates are bounding-box normalized; Unreal local position is not.
+  [ProceduralRock] Principled BSDF (ShaderNodeBsdfPrincipled)
+    Reason: Principled BSDF inputs map onto Unreal's Default Lit shading model; both are PBR but not identical.
+    - Coat, sheen, subsurface and transmission are not mapped.
+    - Alpha below 1 needs a translucent / masked blend mode.
+
+Compiler notes:
+  - Recognized Position -> Noise -> Map Range -> Compare as a SpatialNoiseMask (Coverage Threshold)
+  - Recognized random per-instance scale/rotation as RandomTransform (Place Rocks)
+  - Folded Rotate/Scale Instances with a random value into a RandomTransform before instancing (Random Yaw)
+
+NodeBridge reproduces procedural intent. Unless an operation is EXACT, expect a semantically equivalent system, not vertex- or pixel-identical output.
