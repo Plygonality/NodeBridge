@@ -39,7 +39,7 @@ def extract_native(
     )
     builder = GraphBuilder(
         name=native.name or "untitled",
-        system=GraphSystem.GEOMETRY,
+        system=_graph_system(graph_system),
         provenance=provenance,
     )
     native_to_ir: dict[str, IRNode] = {}
@@ -246,6 +246,17 @@ def _type(name: str, default: str) -> str | DataType:
         "MATRIX": DataType.MATRIX,
     }
     return aliases.get(name.upper(), default)
+
+
+def _graph_system(name: str) -> GraphSystem:
+    key = (name or "").lower()
+    if key in {"shader", "shader_nodes"}:
+        return GraphSystem.SHADER
+    if key in {"compositor", "compositor_nodes"}:
+        return GraphSystem.COMPOSITOR
+    if key in {"geometry", "geometry_nodes"}:
+        return GraphSystem.GEOMETRY
+    return GraphSystem.UNKNOWN if key in {"", "unknown"} else GraphSystem.GEOMETRY
 
 
 def _safe_id(value: str) -> str:

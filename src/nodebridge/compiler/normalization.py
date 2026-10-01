@@ -109,10 +109,23 @@ class DeadNodeElimPass:
 
 def normalize_graph(graph: IRGraph) -> IRGraph:
     """Run the default normalization pipeline."""
+    from nodebridge.compiler.rules import (
+        CollapseReroutePass,
+        FuseInstanceTransformPass,
+        SpatialNoiseMaskPass,
+    )
     from nodebridge.core.passes import PassPipeline
 
     pipeline = PassPipeline(
-        [CanonicalizeOperationsPass(), FuseClampPass(), ConstantFoldPass(), DeadNodeElimPass()]
+        [
+            CanonicalizeOperationsPass(),
+            CollapseReroutePass(),
+            FuseClampPass(),
+            SpatialNoiseMaskPass(),
+            FuseInstanceTransformPass(),
+            ConstantFoldPass(),
+            DeadNodeElimPass(),
+        ]
     )
     return pipeline.run(graph)
 
