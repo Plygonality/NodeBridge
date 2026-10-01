@@ -1,0 +1,85 @@
+NodeBridge Translation Report
+=============================
+
+Source:
+    Geometry Nodes / ScatterRocks  (Blender 4.2.23 LTS)
+Target:
+    Houdini (SOP network)
+
+25 source nodes
+21 semantic operations
+
+✓ EXACT:        10
+≈ EQUIVALENT:   9
+~ APPROXIMATE:  2
+✕ UNSUPPORTED:  0
+
+Operations:
+  ≈ EQUIVALENT  Geometry                   GEOMETRY_INPUT       -> object_merge + placeholder grid + switch
+  ≈ EQUIVALENT  Rock Shape                 PRIMITIVE            -> sphere SOP (polygon)
+  ≈ EQUIVALENT  Scatter Rocks              SCATTER              -> scatter SOP
+  ~ APPROXIMATE Coverage Noise             SPATIAL_NOISE_MASK   -> VEX fractal noise mask
+  ✓ EXACT       Sink Rock                  TRANSFORM            -> xform SOP
+  ✓ EXACT       Remove Sparse Areas        DELETE_GEOMETRY      -> attribwrangle removepoint()/removeprim()
+  ≈ EQUIVALENT  Rock Material              MATERIAL_ASSIGNMENT  -> material SOP
+  ≈ EQUIVALENT  Random Scale               RANDOM_TRANSFORM     -> attribwrangle writing orient / scale
+  ≈ EQUIVALENT  Random Rotation            RANDOM_TRANSFORM     -> attribwrangle writing orient / scale
+  ✓ EXACT       Place Rocks                INSTANCE             -> copytopoints SOP (Pack and Instance)
+  ✓ EXACT       Realize Instances          REALIZE_INSTANCES    -> unpack SOP
+  ✓ EXACT       Join Geometry              MERGE                -> merge SOP
+  ✓ EXACT       Geometry                   GEOMETRY_OUTPUT      -> null OUT (display/render)
+  ≈ EQUIVALENT  Texture Coordinate Object  FIELD_INPUT          -> mtlxposition / mtlxnormal / mtlxtexcoord
+  ✓ EXACT       Mapping                    MAPPING              -> mtlxmultiply + mtlxadd
+  ~ APPROXIMATE Rock Noise                 NOISE                -> mtlxfractal3d
+  ✓ EXACT       Rock Colors                COLOR_RAMP           -> mtlxremap + mtlxclamp + mtlxmix chain
+  ✓ EXACT       Roughness Range            MAP_RANGE            -> mtlxremap (+ mtlxclamp)
+  ≈ EQUIVALENT  Rock Bump                  BUMP                 -> mtlxheighttonormal
+  ≈ EQUIVALENT  Principled BSDF            SHADER_BSDF          -> mtlxstandard_surface
+  ✓ EXACT       Material Output            MATERIAL_OUTPUT      -> material path /mat/<name>
+
+Approximations:
+  Coverage Noise (FunctionNodeCompare, ShaderNodeTexNoise, ShaderNodeMapRange)
+    Reason: Noise of position compared with a threshold; Houdini's noise differs numerically from Blender's.
+    - Mask boundaries follow the same parameters but not the same pattern.
+  Rock Noise (ShaderNodeTexNoise)
+    Reason: Blender fBm noise approximated with MaterialX fractal noise remapped to 0..1.
+    - Pattern will not be numerically identical.
+    - Color output reuses the scalar noise.
+
+Equivalent (intent preserved, details differ):
+  Geometry (NodeGroupInput)
+    Reason: The modifier's input geometry becomes an Object Merge you point at your own object. Until then a placeholder sized like the Blender object is used.
+    - Set 'Use Source Object' on the geo node and the Object Merge path to use real geometry.
+  Rock Shape (GeometryNodeMeshIcoSphere)
+    Reason: Native ico sphere primitive; vertex layout and UVs differ.
+    - Topology (vertex order, pole layout, UVs) differs from Blender.
+  Scatter Rocks (GeometryNodeDistributePointsOnFaces)
+    Reason: Distribute Points on Faces becomes a Scatter SOP driven by density per square unit.
+    - Random sample positions differ from Blender (different random generators).
+  Rock Material (GeometryNodeSetMaterial)
+    Reason: Set Material becomes a Material SOP pointing at /mat/<name>.
+    - The material network is generated only when the Blender material uses nodes.
+  Random Scale (FunctionNodeRandomValue, GeometryNodeInstanceOnPoints)
+    Reason: Per-point random rotation and scale ranges written as instancing attributes with NodeBridge's deterministic random.
+    - Random values differ from Blender's sequence; ranges and distribution are preserved.
+  Random Rotation (FunctionNodeRandomValue, GeometryNodeRotateInstances)
+    Reason: Per-point random rotation and scale ranges written as instancing attributes with NodeBridge's deterministic random.
+    - Random values differ from Blender's sequence; ranges and distribution are preserved.
+  Texture Coordinate Object (ShaderNodeTexCoord)
+    Reason: Texture coordinates map onto MaterialX geometric inputs.
+    - Blender's Generated coordinates are bounding-box normalized; MaterialX object position is not.
+    - Axes follow Houdini's Y-up convention.
+  Rock Bump (ShaderNodeBump)
+    Reason: Height-driven normal perturbation.
+    - Bump distance is folded into the scale.
+  Principled BSDF (ShaderNodeBsdfPrincipled)
+    Reason: Principled BSDF maps onto Autodesk Standard Surface; both are physically based but not identical models.
+    - Specular IOR Level is mapped to specular weight (x2).
+    - Alpha is mapped to opacity.
+
+Compiler notes:
+  - Recognized Position -> Noise -> Map Range -> Compare as a SpatialNoiseMask (Coverage Threshold)
+  - Recognized random per-instance scale/rotation as RandomTransform (Place Rocks)
+  - Folded Rotate/Scale Instances with a random value into a RandomTransform before instancing (Random Yaw)
+
+NodeBridge reproduces procedural intent. Unless an operation is EXACT, expect a semantically equivalent system, not vertex- or pixel-identical output.

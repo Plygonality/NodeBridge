@@ -1,0 +1,44 @@
+NodeBridge Translation Report
+=============================
+
+Source:
+    Compositor / Scene Compositor  (Blender 4.2.23 LTS)
+Target:
+    Unreal Engine 5 (Post Process Volume)
+
+7 source nodes
+5 semantic operations
+
+✓ EXACT:        0
+≈ EQUIVALENT:   2
+~ APPROXIMATE:  3
+✕ UNSUPPORTED:  0
+
+Operations:
+  ≈ EQUIVALENT  Render Layers  RENDER_LAYER         -> rendered scene
+  ~ APPROXIMATE Bloom          GLARE                -> Bloom intensity / threshold
+  ~ APPROXIMATE Grade          COLOR_BALANCE        -> Color grading gain / gamma / offset
+  ~ APPROXIMATE Vignette       VIGNETTE             -> Vignette intensity
+  ≈ EQUIVALENT  Composite      COMPOSITE_OUTPUT     -> unbound Post Process Volume
+
+Approximations:
+  Bloom (CompositorNodeGlare)
+    Reason: Glare becomes Unreal bloom; streaks and ghosts map to bloom as well.
+    - Glare shape (streaks, ghosts, star) is not reproduced.
+  Grade (CompositorNodeColorBalance)
+    Reason: Lift / gamma / gain mapped onto global color grading.
+    - Blender's lift formula differs from Unreal's offset.
+  Vignette (CompositorNodeMixRGB, CompositorNodeEllipseMask, CompositorNodeBlur)
+    Reason: Ellipse mask + blur + multiply recognized as a vignette.
+    - Vignette shape and softness use Unreal's built-in falloff.
+
+Equivalent (intent preserved, details differ):
+  Render Layers (CompositorNodeRLayers)
+    Reason: The volume grades the rendered scene, like a Render Layers input.
+  Composite (CompositorNodeComposite)
+    Reason: The final composite becomes an unbound volume affecting the whole level.
+
+Compiler notes:
+  - Recognized Ellipse Mask -> Blur -> Multiply as a Vignette (Vignette)
+
+NodeBridge reproduces procedural intent. Unless an operation is EXACT, expect a semantically equivalent system, not vertex- or pixel-identical output.

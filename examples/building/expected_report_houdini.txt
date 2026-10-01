@@ -1,0 +1,57 @@
+NodeBridge Translation Report
+=============================
+
+Source:
+    Geometry Nodes / BuildingGenerator  (Blender 4.2.23 LTS)
+Target:
+    Houdini (SOP network)
+
+27 source nodes
+24 semantic operations
+
+✓ EXACT:        21
+≈ EQUIVALENT:   3
+~ APPROXIMATE:  0
+✕ UNSUPPORTED:  0
+
+Operations:
+  ✓ EXACT       Normal             FIELD_INPUT          -> VEX @P / @N / @ptnum / id
+  ✓ EXACT       Window Panel       PRIMITIVE            -> box SOP
+  ✓ EXACT       Footprint          PRIMITIVE            -> grid SOP
+  ✓ EXACT       Building Height    MATH                 -> VEX arithmetic
+  ✓ EXACT       Floor Offset       COMBINE_VECTOR       -> VEX set()
+  ✓ EXACT       Slab Width         MATH                 -> VEX arithmetic
+  ✓ EXACT       Slab Depth         MATH                 -> VEX arithmetic
+  ✓ EXACT       Separate XYZ       SEPARATE_VECTOR      -> VEX components
+  ✓ EXACT       Building Mass      EXTRUDE              -> polyextrude SOP
+  ✓ EXACT       Floor Levels       PRIMITIVE            -> line SOP
+  ✓ EXACT       Floor Slab         SUBGRAPH             -> subnet SOP with promoted parameters
+  ✓ EXACT       Facade Facing      MATH                 -> VEX arithmetic
+  ✓ EXACT       Stack Floors       INSTANCE             -> copytopoints SOP (Pack and Instance)
+  ✓ EXACT       Is Wall            COMPARE              -> VEX comparison
+  ✓ EXACT       Realize Floors     REALIZE_INSTANCES    -> unpack SOP
+  ≈ EQUIVALENT  Window Positions   SCATTER              -> scatter SOP
+  ≈ EQUIVALENT  Window Variation   RANDOM_TRANSFORM     -> attribwrangle writing orient / scale
+  ✓ EXACT       Place Windows      INSTANCE             -> copytopoints SOP (Pack and Instance)
+  ✓ EXACT       Realize Windows    REALIZE_INSTANCES    -> unpack SOP
+  ✓ EXACT       Assemble Building  MERGE                -> merge SOP
+  ≈ EQUIVALENT  Concrete           MATERIAL_ASSIGNMENT  -> material SOP
+  ✓ EXACT       Geometry           GEOMETRY_OUTPUT      -> null OUT (display/render)
+  ✓ EXACT       Slab Outline       PRIMITIVE            -> grid SOP
+  ✓ EXACT       Slab Thickness     EXTRUDE              -> polyextrude SOP
+
+Equivalent (intent preserved, details differ):
+  Window Positions (GeometryNodeDistributePointsOnFaces)
+    Reason: Distribute Points on Faces becomes a Scatter SOP driven by density per square unit.
+    - Random sample positions differ from Blender (different random generators).
+  Window Variation (FunctionNodeRandomValue, GeometryNodeInstanceOnPoints)
+    Reason: Per-point random rotation and scale ranges written as instancing attributes with NodeBridge's deterministic random.
+    - Random values differ from Blender's sequence; ranges and distribution are preserved.
+  Concrete (GeometryNodeSetMaterial)
+    Reason: Set Material becomes a Material SOP pointing at /mat/<name>.
+    - The material network is generated only when the Blender material uses nodes.
+
+Compiler notes:
+  - Recognized random per-instance scale/rotation as RandomTransform (Place Windows)
+
+NodeBridge reproduces procedural intent. Unless an operation is EXACT, expect a semantically equivalent system, not vertex- or pixel-identical output.
