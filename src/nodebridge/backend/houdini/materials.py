@@ -112,21 +112,22 @@ class MtlxBuilder:
 
 def write_material_function(backend, result, w: PyWriter, variables: NameAllocator, *, nested: bool = False) -> str:
     graph = result.semantic
-    function = python_identifier(f"build_material_{graph.name}")
+    name = result.document.source.get("material") or graph.name
+    function = python_identifier(f"build_material_{name}")
     w.line(f"def {function}():")
     w.indent()
-    w.line(f'"""Material {graph.name!r} as a MaterialX network in /mat."""')
+    w.line(f'"""Material {name!r} as a MaterialX network in /mat."""')
     w.line('matnet = hou.node("/mat")')
     builder = MtlxBuilder(backend, result, graph, w, variables)
     outputs = [op for op in graph.ops.values() if op.kind == "MATERIAL_OUTPUT"]
     if outputs:
         _material_output(builder, outputs[0])
     if builder.surface is None:
-        builder.surface = builder.node(None, "mtlxstandard_surface", name=graph.name)
+        builder.surface = builder.node(None, "mtlxstandard_surface", name=name)
     w.line("nb_box = matnet.createNetworkBox()")
     w.line(f"for nb_item in ({', '.join(builder.nodes)},):")
     w.line("    nb_box.addItem(nb_item)")
-    w.line(f"nb_box.setComment({graph.name!r})")
+    w.line(f"nb_box.setComment({name!r})")
     w.line(f"matnet.layoutChildren(items=({', '.join(builder.nodes)},))")
     w.line("nb_box.fitAroundContents()")
     w.line(f"return {builder.surface}")
@@ -173,7 +174,7 @@ PRINCIPLED = {
     ("Specular IOR Level is mapped to specular weight (x2).", "Alpha is mapped to opacity."),
 )
 def _bsdf(mb: MtlxBuilder, op: SemanticOp) -> dict:
-    var = mb.node(op, "mtlxstandard_surface", name=mb.graph.name)
+    var = mb.node(op, "mtlxstandard_surface", name=mb.result.document.source.get("material") or mb.graph.name)
     model = op.params.get("model", "principled")
     if model == "emission":
         mb.set(var, "base", 0.0)

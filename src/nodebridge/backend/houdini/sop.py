@@ -109,7 +109,7 @@ class SopBuilder:
         self.w.blank()
         if self.options.include_comments:
             source = ", ".join(op.source.types) or "generated"
-            self.w.comment(f"{op.display_name}: {op.kind} [{classification.confidence.value}]  (Blender: {source})")
+            self.w.comment(f"{op.display_name}: {op.kind} [{classification.confidence.value}] -> {classification.implementation}  (Blender: {source})")
         item = self.backend.translator(op, CTX)
         if self.result.is_blocked(self.graph, op):
             self.placeholder(op, f"Skipped by strictness ({self.options.strictness.value}): {classification.confidence.value}. {classification.explanation}")
