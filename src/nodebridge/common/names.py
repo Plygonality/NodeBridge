@@ -43,6 +43,14 @@ def houdini_node_name(name: str, fallback: str = "node") -> str:
     return snake_case(name, fallback)[:96]
 
 
+def houdini_label_name(name: str, fallback: str = "node") -> str:
+    """Like :func:`houdini_node_name` but keeps the case (``OUT``, ``IN_Geometry``)."""
+    result = "_".join(w for w in _SPLIT.split(name or "") if w) or fallback
+    if result[0].isdigit():
+        result = f"n_{result}"
+    return result[:96]
+
+
 def houdini_parm_name(name: str, fallback: str = "parm") -> str:
     """Spare parameter names: lowercase identifiers without dots."""
     return snake_case(name, fallback)[:64]
