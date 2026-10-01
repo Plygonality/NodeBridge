@@ -1,10 +1,12 @@
-"""Shader Nodes mapping notes.
+"""Shader node extraction through the graph-IR parser."""
 
-Shader translation is not part of the Geometry Nodes vertical slice.
-``ShaderNodeMath`` and ``ShaderNodeVectorMath`` are used *inside* Geometry
-Nodes and are handled by the Blender host mappings.
-"""
+from __future__ import annotations
 
-from nodebridge.hosts.blender.mappings import MATH_OPERATIONS, VECTOR_OPERATIONS
+from nodebridge.frontend.blender.parser import parse_node_tree
+from nodebridge.compiler.semanticize import semanticize
+from nodebridge.ir.schema import IRDocument
 
-__all__ = ["MATH_OPERATIONS", "VECTOR_OPERATIONS"]
+
+def extract_shader_nodes(source: object) -> IRDocument:
+    """Extract a material node tree into semantic IR."""
+    return semanticize(parse_node_tree(source, system="shader"))

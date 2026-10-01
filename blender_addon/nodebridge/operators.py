@@ -1,1 +1,1 @@
-"""Blender operators (Milestone 6). UI only; no translation logic."""
+"""UI operators live in nodebridge.addon. This module is a pointer."""

@@ -1,1 +1,1 @@
-"""Blender sidebar panels (Milestone 6). UI only; no translation logic."""
+"""UI panels live in nodebridge.addon. This module is a pointer."""

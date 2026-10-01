@@ -27,6 +27,30 @@ from nodebridge.ir.versioning import IR_VERSION, PACKAGE_VERSION
 
 __version__ = PACKAGE_VERSION
 
+bl_info = {
+    "name": "NodeBridge",
+    "author": "NodeBridge Contributors",
+    "version": (0, 3, 0),
+    "blender": (4, 2, 0),
+    "location": "Node Editor > Sidebar > NodeBridge",
+    "description": "Cross-DCC procedural compiler. Translate Blender node graphs into native Houdini and Unreal graphs.",
+    "category": "Node",
+}
+
+
+def register() -> None:
+    """Register the Blender add-on. Called by Blender, not by library imports."""
+    from nodebridge.addon.registration import register as register_addon
+
+    register_addon()
+
+
+def unregister() -> None:
+    """Unregister the Blender add-on."""
+    from nodebridge.addon.registration import unregister as unregister_addon
+
+    unregister_addon()
+
 __all__ = [
     "IR_VERSION",
     "PACKAGE_VERSION",
