@@ -230,6 +230,30 @@ def euler_xyz_from_matrix(matrix: Matrix3) -> Vec3:
     return (rx, ry, rz)
 
 
+def convert_euler_axes(
+    euler: Vec3,
+    source: str | CoordinateFrame,
+    target: str | CoordinateFrame,
+) -> Vec3:
+    """Remap each Euler component onto the target axis, keeping its magnitude.
+
+    Use this for a random range on each axis. A full turn stays a full turn.
+    :func:`convert_euler` converts one composed orientation and will fold a
+    full turn back to zero, which collapses a range.
+    """
+
+    basis = _change_basis(get_frame(source), get_frame(target))
+    output = [0.0, 0.0, 0.0]
+    for axis, component in enumerate(euler):
+        unit = [0.0, 0.0, 0.0]
+        unit[axis] = 1.0
+        landed = _mat_vec(basis, (unit[0], unit[1], unit[2]))
+        index = max(range(3), key=lambda item: abs(landed[item]))
+        sign = 1.0 if landed[index] >= 0.0 else -1.0
+        output[index] += sign * float(component)
+    return (output[0], output[1], output[2])
+
+
 def convert_euler(
     euler: Vec3,
     source: str | CoordinateFrame,

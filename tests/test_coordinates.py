@@ -4,6 +4,7 @@ import pytest
 
 from nodebridge.common.coordinates import (
     convert_euler,
+    convert_euler_axes,
     convert_location,
     convert_normal,
     convert_point,
@@ -45,6 +46,12 @@ def test_scale_permutes_with_axes_and_ignores_sign():
 def test_unreal_uv_flips_v():
     assert convert_uv((0.2, 0.25), "blender", "unreal") == pytest.approx((0.2, 0.75))
     assert convert_uv((0.2, 0.25), "blender", "houdini") == pytest.approx((0.2, 0.25))
+
+
+def test_euler_axis_range_keeps_a_full_turn():
+    # A full turn around Blender's up axis stays a full turn around Houdini's up axis.
+    converted = convert_euler_axes((0.0, 0.0, 6.283185), "blender", "houdini")
+    assert converted == pytest.approx((0.0, 6.283185, 0.0))
 
 
 def test_euler_roundtrip():
