@@ -10,13 +10,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ..backend.base import GeneratedCode
 from ..backend.registry import get_backend
 from ..common.units import ValueRole
 from ..frontend.base import get_frontend
-from ..ir.graph import GraphDocument
+from ..ir.graph import GraphDocument, TreeKind
 from ..ir.operations import get_operation
 from ..ir.semantic import Param, SemanticGraph, SemanticOp
 from ..ir.validation import validate_document, validate_semantic
@@ -159,7 +159,23 @@ def analyze(
         diagnostics=list(diagnostics),
         strictness=options.strictness.value,
     )
+    if options.include_materials and semantic.kind == TreeKind.GEOMETRY and backend.context_for(TreeKind.SHADER):
+        for name, tree_name in (document.source.get("materials") or {}).items():
+            if tree_name not in document.trees:
+                continue
+            sub_document = material_document(document, tree_name, name)
+            sub = analyze(sub_document, target, replace(options, include_materials=False), frontend=frontend, fallback=fallback)
+            result.materials[name] = sub
+            result.report.entries.extend(sub.report.entries)
+            result.report.diagnostics.extend(d for d in sub.diagnostics if d.severity != Severity.INFO)
     return result
+
+
+def material_document(document: GraphDocument, tree_name: str, material: str) -> GraphDocument:
+    trees = {name: tree for name, tree in document.trees.items() if tree.kind == TreeKind.SHADER and (name == tree_name or tree.is_group)}
+    source = {k: v for k, v in document.source.items() if k in ("application", "unit_scale", "fps")}
+    source.update(display_name=material, material=material)
+    return GraphDocument(root=tree_name, trees=trees, source=source)
 
 
 def _ordered_walk(graph: SemanticGraph):

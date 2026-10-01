@@ -307,6 +307,11 @@ def reset():
     return ROOT
 
 
+def summary() -> int:
+    """Number of nodes the script created (excluding the root contexts)."""
+    return sum(1 for _ in all_nodes()) - 4
+
+
 def all_nodes(parent=None):
     parent = parent or ROOT
     for child in parent.children():

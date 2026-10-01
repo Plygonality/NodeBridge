@@ -1,0 +1,19 @@
+schema_version = "1.0.0"
+
+id = "nodebridge"
+version = "0.3.0"
+name = "NodeBridge"
+tagline = "Compile node trees into native Houdini and Unreal code"
+maintainer = "NodeBridge Contributors"
+type = "add-on"
+website = "https://github.com/Plygonality/NodeBridge"
+tags = ["Node", "Pipeline", "Import-Export"]
+blender_version_min = "4.2.0"
+license = ["SPDX:MIT"]
+
+[permissions]
+files = "Save generated scripts to disk"
+clipboard = "Copy generated code and translation reports"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "*.pyc", ".*"]
