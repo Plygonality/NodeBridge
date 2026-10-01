@@ -213,17 +213,18 @@ _op(
     "RANDOM_TRANSFORM",
     G,
     "Per-element random rotation / scale / offset within ranges.",
-    inputs=[_p("geometry", T.POINTS), _p("seed", T.INT, R.INTEGER)],
+    inputs=[
+        _p("geometry", T.POINTS),
+        _p("seed", T.INT, R.INTEGER),
+        _p("rotation_min", T.VECTOR3, R.EULER),
+        _p("rotation_max", T.VECTOR3, R.EULER),
+        _p("scale_min", T.VECTOR3, R.SCALE),
+        _p("scale_max", T.VECTOR3, R.SCALE),
+        _p("offset_min", T.VECTOR3, R.DIRECTION),
+        _p("offset_max", T.VECTOR3, R.DIRECTION),
+    ],
     outputs=[_p("geometry", T.POINTS)],
-    params={
-        "rotation_min": None,
-        "rotation_max": None,
-        "scale_min": None,
-        "scale_max": None,
-        "offset_min": None,
-        "offset_max": None,
-        "uniform_scale": False,
-    },
+    params={"uniform_scale": False, "seed_stream": 0},
 )
 _op(
     "TRANSFORM_POINTS",
