@@ -10,7 +10,17 @@ from nodebridge.ir.serialization import IR_VERSION
 
 __version__ = "0.3.0"
 
-__all__ = ["IR_VERSION", "__version__"]
+bl_info = {
+    "name": "NodeBridge",
+    "author": "NodeBridge Contributors",
+    "version": (0, 3, 0),
+    "blender": (4, 2, 0),
+    "location": "View3D and Node Editor > Sidebar > NodeBridge",
+    "description": "Cross-DCC procedural compiler for Geometry Nodes, shaders, and the compositor",
+    "category": "Node",
+}
+
+__all__ = ["IR_VERSION", "__version__", "bl_info"]
 
 
 def register() -> None:
