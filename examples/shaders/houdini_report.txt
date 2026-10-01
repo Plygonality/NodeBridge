@@ -1,0 +1,36 @@
+NodeBridge Translation Report
+=============================
+Source: shader / Facade
+Target: houdini (sop)
+
+5 source nodes
+5 semantic operations
+
+EXACT: 0
+EQUIVALENT: 3
+APPROXIMATE: 2
+UNSUPPORTED: 0
+
+The expected result is a semantically equivalent procedural system.
+It is not a promise of identical vertices, samples, or pixels.
+
+Approximation:
+    ShaderNodeBump
+    A normal map is not Blender's Bump node.
+    ShaderNodeValToRGB
+    A color ramp is not reproduced. A mix stands in for a two-stop blend.
+
+Equivalent:
+    ShaderNodeTexNoise
+    MaterialX noise is not Blender's Noise Texture. The pattern will not match.
+    ShaderNodeBsdfPrincipled
+    MaterialX Standard Surface approximates Principled BSDF. Closures are not numerically identical.
+    ShaderNodeOutputMaterial
+    The material output is a MaterialX surface material inside a Material Builder.
+
+Diagnostics:
+    [warning] Operation 'procedural.noise' lowered into a native fragment (MaterialX noise is not Blender's Noise Texture. The pattern will not match.)
+    [warning] Operation 'shader.normal' approximated (A normal map is not Blender's Bump node.)
+    [warning] Operation 'color.ramp' approximated (A color ramp is not reproduced. A mix stands in for a two-stop blend.)
+    [warning] Operation 'shader.principled_surface' lowered into a native fragment (MaterialX Standard Surface approximates Principled BSDF. Closures are not numerically identical.)
+    [warning] Operation 'shader.output' lowered into a native fragment (The material output is a MaterialX surface material inside a Material Builder.)

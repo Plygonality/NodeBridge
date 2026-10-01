@@ -1,46 +1,35 @@
-# Houdini host
+# Houdini backend
 
-Status: **frontend and backend implemented** for a small SOP subset, at
-the construction-plan / fixture level. Live `hou` execution is optional
-and not exercised in CI.
+Generated scripts are pasted into the Houdini Python Source Editor and executed there. NodeBridge does not launch Houdini.
 
-```
-SOP network  ↕  HoudiniFrontend / HoudiniBackend  ↕  Semantic IR
-```
+## Geometry
 
-## Frontend
+The script creates a new `/obj` Geometry node. It deletes only the default children of that new node. Other scene nodes are left alone.
 
-Maps SOP types such as `scatter`, `copytopoints`, `unpack`, `xform`,
-`attribrandomize`, `box`, and `null` (input/output) onto semantic
-operations. Native type names stay in provenance.
+Typical lowering:
 
-## Backend
-
-Uses native SOPs whenever a defensible mapping exists.
-
-| Semantic operation | Realization | Fidelity |
+| Semantic operation | Houdini | Confidence |
 | --- | --- | --- |
-| `geometry.transform` | `xform` | EXACT |
-| `points.distribute` | `scatter` | EXACT |
-| `geometry.instance` | `copytopoints` | LOWERED |
-| `geometry.realize_instances` | `unpack` → `convert` | LOWERED |
-| `random.vector` | `attribrandomize` → wrangle bind | LOWERED |
-| `math.*` / `vector.*` | Attribute Wrangle + generated VEX | CUSTOM_CODE |
-| `geometry.modify_position` | Attribute Wrangle writing `@P` | CUSTOM_CODE |
+| `geometry.primitive` | `box`, `sphere`, `grid`, `tube`, `circle`, `line` | Exact |
+| `geometry.transform` | `xform` | Exact |
+| `geometry.join` | `merge` | Exact |
+| `points.distribute` | `scatter` | Equivalent. Density becomes `npts`. The random sequence differs. |
+| `geometry.instance` | `copytopoints` | Equivalent |
+| `geometry.realize_instances` | `unpack` then `convert` | Equivalent |
+| `math.*`, `vector.*`, noise | `attribwrangle` | Equivalent. VEX is not Blender's implementation. |
+| `geometry.subdivide` | `subdivide` | Approximate |
+| `geometry.curve_to_mesh` | `sweep` | Approximate |
 
-VEX is not used merely because a SOP mapping would be inconvenient.
-Scalar/vector field math has no general SOP; those ops are explicitly
-`CUSTOM_CODE`.
+Node types are created through a helper that raises `hou.NodeError` when the type is missing.
 
-Generated VEX is deterministic and covered by tests. It is stored as
-data on the construction plan and in the translation report. Loading IR
-does not run it.
+## Materials
 
-## Scripts
+Shader graphs create a Material Builder under `/mat` and MaterialX nodes (`mtlxstandard_surface`, `mtlxnoise3d`, `mtlxmix`, and math nodes). Principled BSDF is equivalent, not identical. Noise will not match.
 
-`HoudiniBackend.generate()` emits `hou` Python that creates a geo
-container and SOP nodes. Execute it only inside Houdini.
+## Compositor
 
-## Isolation
+COP2 nodes inside `/img`: `colorcorrect`, `blur`, `blend`, `null`. Glare is an approximate blur. Ellipse and box masks are unsupported. If `/img` is missing, the script raises instead of inventing a Copernicus network.
 
-`hou` is loaded via importlib from `hosts/houdini/runtime.py` only.
+## Coordinates and units
+
+Blender position `(x, y, z)` becomes Houdini `(x, z, -y)`. Rotation values on transform parameters are converted from radians to degrees. Lengths stay in meters.

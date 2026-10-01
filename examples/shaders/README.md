@@ -1,5 +1,7 @@
-# Shader examples
+# Example: procedural shader
 
-Shader-graph translation is not part of the 0.2 vertical slice. The
-operation catalog includes a few shader names so unknown graphs can
-round-trip, but no host implements a shader backend yet.
+Noise → color ramp → roughness and bump → Principled BSDF → material output.
+
+Houdini builds a Material Builder. Unreal builds a Material asset with `MaterialEditingLibrary`.
+
+Noise and the Principled closure are not numerically identical to Blender. The color ramp is approximate.

@@ -1,0 +1,34 @@
+NodeBridge Translation Report
+=============================
+Source: compositor / Grade
+Target: unreal (pcg)
+
+5 source nodes
+5 semantic operations
+
+EXACT: 0
+EQUIVALENT: 0
+APPROXIMATE: 0
+UNSUPPORTED: 5
+
+The expected result is a semantically equivalent procedural system.
+It is not a promise of identical vertices, samples, or pixels.
+
+Unsupported:
+    CompositorNodeEllipseMask
+    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
+    CompositorNodeRLayers
+    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
+    CompositorNodeGlare
+    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
+    CompositorNodeColorBalance
+    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
+    CompositorNodeComposite
+    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
+
+Diagnostics:
+    [error] Operation 'compositor.mask' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
+    [error] Operation 'compositor.input' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
+    [error] Operation 'compositor.glare' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
+    [error] Operation 'compositor.color_correct' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
+    [error] Operation 'compositor.output' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)

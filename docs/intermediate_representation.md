@@ -8,7 +8,7 @@ It is not Blender Python, not Houdini Python, and not a bag of UI names.
 
 ```json
 {
-  "nodebridge_version": "0.2.0",
+  "nodebridge_version": "0.3.0",
   "ir_version": "1",
   "source": {
     "application": "blender",

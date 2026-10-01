@@ -1,55 +1,39 @@
-# Blender host
+# Blender add-on
 
-Status: **frontend and backend implemented** for a small Geometry Nodes
-subset, at the construction-plan / fixture level. Live `bpy` extraction
-is optional and not exercised in CI.
+NodeBridge installs as a Blender add-on. The panel is **NodeBridge** in the node editor sidebar and the 3D viewport sidebar.
 
-Blender is a peer host, not a privileged source.
+## Install
 
-```
-Geometry Nodes  ↕  BlenderFrontend / BlenderBackend  ↕  Semantic IR
+```bash
+cd src && zip -r ../nodebridge.zip nodebridge
 ```
 
-## Frontend
+Preferences → Add-ons → Install → `nodebridge.zip` → enable NodeBridge.
 
-`BlenderFrontend.extract()` accepts:
+Blender 4.2 or newer. The compiler itself is Python 3.11+ and does not need Blender to run tests.
 
-* a `NativeGraph` fixture
-* a JSON dict
-* a duck-typed bpy tree (`nodes`, `links`, `bl_idname`)
+## What the panel does
 
-`nodebridge.hosts.blender.runtime.native_from_bpy` uses importlib and
-raises if `bpy` is missing.
+The add-on infers the active tree:
 
-`bl_idname` values become provenance, not IR operations. Parameter-aware
-dispatch maps `ShaderNodeMath` / `ShaderNodeVectorMath` /
-`FunctionNodeRandomValue` onto several semantic operations.
+- Geometry Nodes editor, or the active object's Geometry Nodes modifier
+- Shader editor material
+- Compositor
 
-## Backend
+**Analyze Graph** parses that tree, including nested groups, builds graph IR and semantic IR, and shows exact / equivalent / approximate / unsupported counts.
 
-`BlenderBackend.build()` returns a Geometry Nodes construction plan.
-`generate()` emits bpy script **text**. Loading IR never runs it.
+**Generate Code** writes the target script into the panel, the clipboard source, and a text block named `NodeBridge.py`.
 
-## Vertical slice mappings
+**Copy Code** assigns `window_manager.clipboard`.
 
-| Semantic operation | Blender native type |
-| --- | --- |
-| `graph.input` / `graph.output` | `NodeGroupInput` / `NodeGroupOutput` |
-| `points.distribute` | `GeometryNodeDistributePointsOnFaces` |
-| `geometry.instance` | `GeometryNodeInstanceOnPoints` |
-| `geometry.realize_instances` | `GeometryNodeRealizeInstances` |
-| `geometry.transform` | `GeometryNodeTransform` |
-| `geometry.primitive` | mesh primitive nodes |
-| `random.vector` | `FunctionNodeRandomValue` |
-| `math.*` | `ShaderNodeMath` |
+**Save Script** writes a `.py` file.
 
-## Runtime limitations
+**Copy Report** copies the translation report on its own.
 
-* Requires Blender 4.2+ for Geometry Nodes as used here.
-* Nested groups, simulation zones, and viewer nodes are not lowered.
-* The add-on under `blender_addon/` is a UI shell only.
+Advanced options: strictness, comments, source names, organized layout, metadata, deterministic randomness, debug output.
 
-## Isolation
+Strictness never hides an omitted operation. Exact-only mode leaves equivalent and approximate operations as comments and report entries.
 
-`import bpy` is not a static import anywhere in the package. Only
-`hosts/blender/runtime.py` loads it, and only when called.
+## Parser
+
+`nodebridge.frontend.blender.parser` reads nodes, sockets, links, interface sockets, object/material/collection references, and nested node groups. It accepts live `bpy` trees and test stand-ins. It does not import `bpy` at library import time.

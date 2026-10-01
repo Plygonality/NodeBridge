@@ -1,31 +1,45 @@
-# Compatibility matrix
+# Compatibility
 
-Statuses use the IR fidelity vocabulary. This table describes the
-**implemented construction-plan mappings** for the vertical slice, not
-live DCC execution.
+Confidence is one of exact, equivalent, approximate, or unsupported. There is no compatibility percentage.
 
-There is no compatibility percentage.
+Host-wide availability is `Host.implementation_for`. A shader or compositor operation can still lower when the graph system matches, even if the geometry SOP table does not list it. The translation report for a real graph is the source of truth.
 
-| Operation | Blender GN | Houdini SOP | Unreal PCG |
-| --- | --- | --- | --- |
-| `graph.input` / `graph.output` | EXACT | EXACT | EXACT |
-| `geometry.transform` | EXACT | EXACT | EXACT |
-| `geometry.join` | EXACT | EXACT | EXACT |
-| `geometry.primitive` | EXACT | EXACT | APPROXIMATE |
-| `points.distribute` | EXACT | EXACT | EXACT |
-| `geometry.instance` | EXACT | LOWERED | APPROXIMATE |
-| `geometry.realize_instances` | EXACT | LOWERED | APPROXIMATE |
-| `random.float` | EXACT | EXACT | EXACT |
-| `random.vector` | EXACT | LOWERED | APPROXIMATE |
-| `math.add` (and siblings) | EXACT | CUSTOM_CODE (VEX) | UNSUPPORTED |
-| `vector.add` (and siblings) | EXACT | CUSTOM_CODE (VEX) | UNSUPPORTED |
-| `math.clamp` | EXACT | CUSTOM_CODE | UNSUPPORTED |
-| `geometry.modify_position` | EXACT | CUSTOM_CODE | UNSUPPORTED |
-| `attribute.read` / `write` | EXACT | APPROXIMATE | APPROXIMATE |
-| `shader.principled_surface` | mapped, not in slice | UNSUPPORTED | UNSUPPORTED |
+## Geometry, both targets
 
-Unregistered operations compile to a visible `nodebridge.unsupported`
-placeholder plus an error diagnostic. They are never silently dropped.
+| Operation | Houdini | Unreal PCG |
+| --- | --- | --- |
+| Transform | Exact | Exact |
+| Join | Exact | Exact |
+| Scatter | Equivalent | Equivalent |
+| Instance | Equivalent | Approximate |
+| Realize instances | Equivalent | Approximate |
+| Math / vector math | Equivalent (VEX) | Unsupported |
+| Noise | Equivalent | Unsupported in PCG, equivalent in materials |
+| Raycast | Equivalent | Unsupported |
+| Subdivide | Approximate | Unsupported |
+| Simulation | Unsupported | Unsupported |
 
-Shader, compositor, and most Geometry Nodes / SOP / PCG catalogs are
-**out of scope** for 0.2.
+## Shaders
+
+Houdini MaterialX and Unreal Materials cover Principled, noise, mix, math, texcoord, and image sample at equivalent or approximate confidence. Color ramps and bump are approximate.
+
+## Compositor
+
+Houdini COP2 covers input, color correction, blur, and mix. Glare is approximate. Masks are unsupported. Unreal is unsupported for the compositor system.
+
+## Coordinates
+
+| | Up | Handedness |
+| --- | --- | --- |
+| Blender | Z | Right |
+| Houdini | Y | Right |
+| Unreal | Z | Left |
+
+Blender → Houdini position: `(x, z, -y)`.
+Blender → Unreal position: `(y, x, z)`.
+Blender meters → Unreal centimeters: multiply by 100.
+Blender radians → Houdini and Unreal degrees.
+
+## Random
+
+`random_unit(seed, element_id)` is NodeBridge's sequence. It is stable in Python. The VEX source in `nodebridge.common.random` is a line-by-line port and is not executed in CI. Host scatter nodes do not use it, and the report says the samples may differ.

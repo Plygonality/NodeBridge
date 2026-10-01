@@ -1,68 +1,19 @@
 # Roadmap
 
-Do not attempt every node in every DCC. Build vertically: a complete
-path for a small semantic subset, then widen.
-
-This roadmap is reconciled with the repository. Milestone 1 (core IR)
-shipped in 0.1. Version 0.2 implements the many-to-many compiler
-architecture and a Blender ↔ Houdini construction-plan slice — work that
-spans several of the originally numbered milestones.
-
-## Completed
-
-### Milestone 1 — Semantic compiler core (0.1, evolved in 0.2)
-
-IR, types, validation, JSON, diagnostics, operation catalog, package
-skeleton.
-
-### Milestone 2–7 (architecture + vertical slice in 0.2)
-
-* Host plugin contract with frontend **and** backend per host
-* Capability model and translation planner
-* Blender Geometry Nodes frontend + backend (fixtures / construction plans)
-* Houdini SOP frontend + backend (fixtures / construction plans / VEX)
-* Bidirectional Blender ↔ Houdini slice for scattering + transforms
-* Unreal PCG frontend + backend contracts, fixtures, experimental scripts
-* Structured fidelity reports (`EXACT` … `UNSUPPORTED`)
-* CLI: inspect, validate, capabilities, plan, report, translate
-
-Live DCC execution is still optional and not CI-covered.
+The compiler slice in 0.3 is the Blender add-on, graph IR, semantic IR, and generated Houdini and Unreal Python for a documented subset.
 
 ## Next
 
-### Milestone 8 — Real Blender ↔ Houdini runtime slice
+1. Execute the scatter script in Houdini and adjust parameter names (`npts`, `seed`, Copy to Points packing) against that build.
+2. Execute the PCG script in one Unreal editor version and record the pin labels that `add_edge` accepts.
+3. Fill subnet contents for nested node groups, and bind spare parameters with `ch()` expressions.
+4. Add boolean, curve, and attribute operations one at a time, each with a recipe, a confidence label, and a test.
+5. Implement a Houdini frontend that is as thorough as the Blender parser, so translation can run back toward Blender.
 
-Run the scattering subset against actual `bpy` and `hou` sessions.
-Verify editable Graphs in both applications. This is the highest-leverage
-next step for real-world usefulness.
+## Later
 
-### Milestone 9 — Unreal PCG editor integration
+Maya, Bifrost, Substance Designer, Godot, Cinema 4D, and Nuke, each as a host plugin.
 
-Where the experimental Python API permits: create a PCG graph asset,
-add Surface Sampler / Transform Points / Static Mesh Spawner, wire pins
-with verified labels. Keep fixture tests as the CI path.
+Simulation zones, repeat zones, and baking stay unsupported until there is a real target representation.
 
-### Milestone 10 — Expanded semantic operation catalog
-
-Incrementally: more primitives, curves, attributes, selections, noise,
-deletes, joins. Each operation needs frontend + backend + tests + a
-fidelity label.
-
-### Milestone 11 — Round-trip metadata
-
-Richer provenance, translation history on generated nodes, and tools to
-diff two IR graphs semantically after an artist edit in the target DCC.
-Perfect equivalence is still not the goal.
-
-### Milestone 12 — Additional DCC host SDK
-
-Maya/Bifrost, Substance Designer, or Nuke as a fourth host implemented
-only through the host contract.
-
-## Explicitly later
-
-* Live localhost / IPC bridge
-* Simulation and repeat zones
-* Full shader / compositor coverage
-* Baking evaluators
-* USD / MaterialX interchange
+An optional `TranslationFallbackProvider` may explain gaps later. It is not on the translation path today.

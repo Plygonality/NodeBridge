@@ -1,0 +1,33 @@
+NodeBridge Translation Report
+=============================
+Source: shader / Facade
+Target: unreal (pcg)
+
+5 source nodes
+5 semantic operations
+
+EXACT: 1
+EQUIVALENT: 1
+APPROXIMATE: 3
+UNSUPPORTED: 0
+
+The expected result is a semantically equivalent procedural system.
+It is not a promise of identical vertices, samples, or pixels.
+
+Approximation:
+    ShaderNodeBump
+    Normal Map approximates bump and normal-map nodes.
+    ShaderNodeValToRGB
+    A color ramp is not reproduced. A lerp stands in for a two-stop blend.
+    ShaderNodeBsdfPrincipled
+    Material attributes approximate Principled BSDF. They are not the same closure.
+
+Equivalent:
+    ShaderNodeTexNoise
+    Unreal noise is not Blender's Noise Texture.
+
+Diagnostics:
+    [warning] Operation 'procedural.noise' lowered into a native fragment (Unreal noise is not Blender's Noise Texture.)
+    [warning] Operation 'shader.normal' approximated (Normal Map approximates bump and normal-map nodes.)
+    [warning] Operation 'color.ramp' approximated (A color ramp is not reproduced. A lerp stands in for a two-stop blend.)
+    [warning] Operation 'shader.principled_surface' approximated (Material attributes approximate Principled BSDF. They are not the same closure.)

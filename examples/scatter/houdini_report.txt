@@ -1,0 +1,27 @@
+NodeBridge Translation Report
+=============================
+Source: geometry_nodes / BuildingGenerator
+Target: houdini (sop)
+
+5 source nodes
+5 semantic operations
+
+EXACT: 2
+EQUIVALENT: 3
+APPROXIMATE: 0
+UNSUPPORTED: 0
+
+The expected result is a semantically equivalent procedural system.
+It is not a promise of identical vertices, samples, or pixels.
+
+Equivalent:
+    GeometryNodeDistributePointsOnFaces
+    Target random samples may differ.
+    GeometryNodeInstanceOnPoints
+    Copy to Points instances the template onto points; scale/rotation use point attributes when wired.
+    GeometryNodeRealizeInstances
+    Packed instances unpack then convert into explicit geometry.
+
+Diagnostics:
+    [warning] Operation 'geometry.instance' lowered into a native fragment (Copy to Points instances the template onto points; scale/rotation use point attributes when wired.)
+    [warning] Operation 'geometry.realize_instances' lowered into a native fragment (Packed instances unpack then convert into explicit geometry.)

@@ -1,0 +1,35 @@
+NodeBridge Translation Report
+=============================
+Source: compositor / Grade
+Target: houdini (sop)
+
+5 source nodes
+5 semantic operations
+
+EXACT: 1
+EQUIVALENT: 2
+APPROXIMATE: 1
+UNSUPPORTED: 1
+
+The expected result is a semantically equivalent procedural system.
+It is not a promise of identical vertices, samples, or pixels.
+
+Unsupported:
+    CompositorNodeEllipseMask
+    Reason: No Houdini SOP mapping is registered
+
+Approximation:
+    CompositorNodeGlare
+    Glare has no direct COP2 node. A blur is a stand-in, not a glare kernel.
+
+Equivalent:
+    CompositorNodeColorBalance
+    Color correction uses COP2 colorcorrect. Lift/gamma/gain controls may differ.
+    CompositorNodeComposite
+    Composite output is a COP null the artist can wire to a ROP.
+
+Diagnostics:
+    [error] Operation 'compositor.mask' has no defensible translation (No Houdini SOP mapping is registered)
+    [warning] Operation 'compositor.glare' approximated (Glare has no direct COP2 node. A blur is a stand-in, not a glare kernel.)
+    [warning] Operation 'compositor.color_correct' lowered into a native fragment (Color correction uses COP2 colorcorrect. Lift/gamma/gain controls may differ.)
+    [warning] Operation 'compositor.output' lowered into a native fragment (Composite output is a COP null the artist can wire to a ROP.)

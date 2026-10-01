@@ -1,141 +1,95 @@
 # Architecture
 
-NodeBridge is a compiler for procedural graphs. Source inspection, semantic
-representation, and target generation never collapse into one another.
+NodeBridge is a compiler. Parsing, meaning, and target code stay separate.
 
 ```
-                         NodeBridge
-                    Semantic Compiler
-
-                           IR
-                           │
-                ┌──────────┼──────────┐
-                │          │          │
-             Blender    Houdini     Unreal
-                ↕          ↕          ↕
-               GN        SOP/VEX      PCG
+Blender node tree
+        │
+        ▼
+BlenderFrontend.parse          graph IR (structure)
+        │
+        ▼
+analyze_dependencies           order, cycles, dead nodes, branches
+        │
+        ▼
+semanticize                    semantic IR (operations)
+        │
+        ▼
+normalize / rewrite rules      smaller semantic graph
+        │
+        ▼
+capability + confidence        exact, equivalent, approximate, unsupported
+        │
+        ▼
+HoudiniBackend / UnrealBackend generated Python
+        │
+        ▼
+native SOP, MaterialX, COP, PCG, or Material graph
 ```
 
-The central rule: **NodeBridge translates procedural semantics between
-applications. It does not merely translate node names.**
+The rule: **do not translate node names. Translate procedural meaning.**
 
-It is not a collection of pairwise converters. Adding Maya, Substance, or
-Nuke should mean implementing the host contract, not editing every existing
-host and not adding `if host == ...` branches to the compiler.
+`GeometryNodeDistributePointsOnFaces` is metadata on a graph-IR node. The semantic operation is `points.distribute`. The Houdini backend chooses a Scatter SOP. The Unreal backend chooses a Surface Sampler. Those choices are recipes, not the identity of the IR.
 
-## Layers
+## Two representations
 
-### Core (`nodebridge.core`)
+### Graph IR (`nodebridge.ir.graph_ir`)
 
-Application-agnostic primitives:
+Preserves structure:
 
-* graphs, nodes, sockets, connections
-* data types and type compatibility
-* semantic operations and their schemas
-* diagnostics and translation fidelity
-* provenance / UI metadata
-* rewrite-pass protocol
+- `NodeTree`, `GraphNode`, `GraphSocket`, `GraphEdge`, `NodeParameter`
+- node ids, names, source type names, defaults, nested groups
+- JSON serialization for debugging
 
-Core code must never import `bpy`, `hou`, or Unreal Python.
+Editor coordinates are optional metadata. Ordering comes from links.
 
-### IR (`nodebridge.ir`)
+### Semantic IR (`nodebridge.core`)
 
-Versioned documents around a graph:
+Preserves meaning:
 
-* schema envelope (`nodebridge_version`, `ir_version`, `source`, `graph`)
-* JSON serialization and deserialization
-* structural validation
-* migration hooks
+- `geometry.transform`, `points.distribute`, `geometry.instance`, `procedural.noise`
+- sockets, parameters, nested graphs, provenance
 
-Serialization is a separate concern from the in-memory model. Loading a
-`.nodebridge.json` file never executes embedded code.
+The source Blender type is stored on the node as provenance. Backends are not allowed to treat that string as the operation.
 
-### Compiler (`nodebridge.compiler`)
+## Rewrite rules
 
-```
-validate → normalize → plan → lower → generate → report
-```
+`nodebridge.compiler.rules` is a pass pipeline, not a hardcoded pair of examples.
 
-* **normalize** — alias canonicalization, clamp fusion, constant folding
-* **plan** — ask the target host how each operation will be realized
-* **lower** — expand one semantic operation into a native fragment
-* **report** — classify every operation; no invented compatibility %
+- `CollapseReroutePass` deletes reroutes and reconnects neighbors.
+- `FuseClampPass` turns min/max pairs into `math.clamp`.
+- `SpatialNoiseMaskPass` fuses noise → map range → compare into `selection.spatial_noise` when each step has a single consumer.
+- `FuseInstanceTransformPass` folds Rotate Instances and Scale Instances into the preceding Instance operation.
 
-### Hosts (`nodebridge.hosts`)
+A rule that cannot match leaves the graph unchanged.
 
-Each DCC is a plugin with:
+## Backends
 
-* id, display name, versions, graph systems
-* capability declaration
-* frontend (native → IR)
-* backend (IR → native construction plan + optional script text)
-* semantic mappings and lowering recipes
+`TargetBackend` is the host backend: `implementation_for`, `lower_node`, `build`, `generate`.
 
-Blender is a host, not the identity of the project. Houdini and Unreal
-are peer hosts, not terminal export targets.
+`HoudiniBackend` writes SOP Python, and switches to a Material Builder or a COP2 network from the graph system. `UnrealBackend` writes PCG Python, Material Editor Python, or an explicit compositor refusal.
 
-### Compatibility shims
+Recipes are data (`Recipe`, `NodeTemplate`) registered on the host. They are not a single `if node.type` chain.
 
-`nodebridge.adapters` and `nodebridge.backends` re-export the host
-frontends/backends so Milestone 1 imports (`BlenderExtractor`,
-`HoudiniBackend`, `UnrealBackend`) keep working.
+## Shared conversions
 
-## Why an IR
-
-Direct `Blender Node → Houdini Node` mapping fails as soon as:
-
-* one source node needs several target nodes
-* several source nodes normalize into one semantic operation
-* two applications share intent but not UI
-* a field in Blender is an attribute in Houdini
-* a shader graph and a geometry graph need different Unreal systems
-
-The IR names *operations* (`geometry.transform`, `points.distribute`)
-rather than widgets (`GeometryNodeTransform`, `scatter`).
-
-## One-to-many and many-to-one
-
-Lowering recipes return **fragments**:
-
-* zero or more native nodes
-* connections inside the fragment
-* a fidelity classification
-* optional generated host code (VEX, Python)
-
-Example: `geometry.realize_instances` on Houdini becomes Unpack → Convert
-(`LOWERED`). `math.max` followed by `math.min` normalizes to `math.clamp`
-(many-to-one) before any host is consulted.
-
-## Metadata versus semantics
-
-Each node stores:
-
-* **operation** — what it means
-* **sockets / parameters** — data flow and constants
-* **provenance** — where it came from (`original_type`, `original_id`)
-* **UI hints** — position, frames, mute, labels
-* **history** — translation events for round-trip diagnostics
-
-Translation decisions use operations, types, and data flow. Provenance
-must never be used to fake equivalent behavior.
-
-## Isolation rules
-
-| Package | May import host SDKs? |
+| Module | Responsibility |
 | --- | --- |
-| `nodebridge.core` | No |
-| `nodebridge.ir` | No |
-| `nodebridge.compiler` | No |
-| `nodebridge.cli` | No |
-| `nodebridge.translators` | No |
-| `nodebridge.hosts.*.runtime` | Yes, via importlib, optional |
-| `blender_addon` | Yes, `bpy`, UI only |
+| `nodebridge.common.coordinates` | Handedness, up axis, position, normal, scale, Euler, UV |
+| `nodebridge.common.units` | Meters, centimeters, radians, degrees, frames |
+| `nodebridge.common.random` | `random_unit(seed, element_id)` and the VEX port |
+| `nodebridge.common.names` | `Building Scatter` → `building_scatter` |
 
-Static `import bpy` / `import hou` / `import unreal` are forbidden
-everywhere so `import nodebridge` works in ordinary Python.
+Translators call these. They do not embed their own axis swaps.
 
-## Safety
+## What stays out of the core
 
-Generated Python, VEX, and Unreal scripts are **not** the IR. They are
-emitted by an explicit `generate` stage. Opening a `.nodebridge.json`
-file must not run them.
+`import nodebridge` does not import `bpy`, `hou`, or `unreal`. The Blender panel lives in `nodebridge.addon` and is loaded only when Blender calls `register()`. Host SDKs are named inside generated scripts, which are text, and inside optional runtime modules via importlib.
+
+Generated Python is not the IR. Opening a `.nodebridge.json` file does not run it.
+
+## Extending
+
+A new DCC implements `SourceFrontend` or a host backend and registers recipes. A new semantic operation is an `OperationSpec` plus zero or more recipes. Missing recipes classify as unsupported.
+
+`TranslationFallbackProvider` can later explain a gap. The shipping compiler uses no provider.

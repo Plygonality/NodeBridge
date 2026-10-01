@@ -1,0 +1,30 @@
+NodeBridge Translation Report
+=============================
+Source: geometry_nodes / BuildingGenerator
+Target: houdini (sop)
+
+5 source nodes
+5 semantic operations
+
+EXACT: 2
+EQUIVALENT: 2
+APPROXIMATE: 1
+UNSUPPORTED: 0
+
+The expected result is a semantically equivalent procedural system.
+It is not a promise of identical vertices, samples, or pixels.
+
+Approximation:
+    GeometryNodeSubdivideMesh
+    Houdini Subdivide is not Blender's subdivision algorithm.
+
+Equivalent:
+    GeometryNodeExtrudeMesh
+    PolyExtrude matches the intent of Extrude Mesh. Inset and individual-face options are not fully reproduced.
+    GeometryNodeSetMaterial
+    Material SOP assigns a shop material path. Blender material slots are not copied.
+
+Diagnostics:
+    [warning] Operation 'geometry.extrude' lowered into a native fragment (PolyExtrude matches the intent of Extrude Mesh. Inset and individual-face options are not fully reproduced.)
+    [warning] Operation 'geometry.subdivide' approximated (Houdini Subdivide is not Blender's subdivision algorithm.)
+    [warning] Operation 'geometry.set_material' lowered into a native fragment (Material SOP assigns a shop material path. Blender material slots are not copied.)

@@ -1,7 +1,16 @@
 # Translation fidelity
 
+The add-on and the translation report use four public classes: **exact**,
+**equivalent**, **approximate**, and **unsupported**. Equivalent covers
+internal statuses `LOWERED` and `CUSTOM_CODE`. Approximate covers
+`APPROXIMATE` and `BAKED`. Stochastic operations such as scatter and noise
+are not reported as exact even when a native node exists, because the
+samples are not the same sequence.
+
 Every translated semantic operation is classified. Silence is not a
 success. There is **no compatibility percentage**.
+
+Internal statuses, used by recipes:
 
 | Status | Meaning |
 | --- | --- |

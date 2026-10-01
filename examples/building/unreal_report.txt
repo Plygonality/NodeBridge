@@ -1,0 +1,33 @@
+NodeBridge Translation Report
+=============================
+Source: geometry_nodes / BuildingGenerator
+Target: unreal (pcg)
+
+5 source nodes
+5 semantic operations
+
+EXACT: 1
+EQUIVALENT: 0
+APPROXIMATE: 1
+UNSUPPORTED: 3
+
+The expected result is a semantically equivalent procedural system.
+It is not a promise of identical vertices, samples, or pixels.
+
+Unsupported:
+    GeometryNodeExtrudeMesh
+    Reason: No Unreal PCG mapping is registered. Do not invent a Material or Blueprint substitute silently.
+    GeometryNodeSubdivideMesh
+    Reason: No Unreal PCG mapping is registered. Do not invent a Material or Blueprint substitute silently.
+    GeometryNodeSetMaterial
+    Reason: No Unreal PCG mapping is registered. Do not invent a Material or Blueprint substitute silently.
+
+Approximation:
+    GeometryNodeMeshGrid
+    PCG samples points from a mesh asset; it does not author a mesh primitive SOP-style.
+
+Diagnostics:
+    [warning] Operation 'geometry.primitive' approximated (PCG samples points from a mesh asset; it does not author a mesh primitive SOP-style.)
+    [error] Operation 'geometry.extrude' has no defensible translation (No Unreal PCG mapping is registered. Do not invent a Material or Blueprint substitute silently.)
+    [error] Operation 'geometry.subdivide' has no defensible translation (No Unreal PCG mapping is registered. Do not invent a Material or Blueprint substitute silently.)
+    [error] Operation 'geometry.set_material' has no defensible translation (No Unreal PCG mapping is registered. Do not invent a Material or Blueprint substitute silently.)

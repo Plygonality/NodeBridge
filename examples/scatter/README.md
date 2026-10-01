@@ -1,17 +1,8 @@
-# Scattering vertical slice
+# Example: procedural scatter
 
-A minimal procedural scatter:
+Primitive mesh → distribute points → instance → realize instances.
 
-Mesh → distribute points → random scale → instance → realize instances
+`houdini_generated.py` is the Houdini Python Source Editor script.
+`houdini_report.txt` is the translation report.
 
-This directory holds **native graph fixtures**, not live `.blend` / `.hip`
-files. They exercise frontends and backends without Blender or Houdini
-installed.
-
-```bash
-nodebridge translate examples/scatter/blender_scatter.native.json --source blender --target houdini
-nodebridge translate examples/scatter/houdini_scatter.native.json --source houdini --target blender
-```
-
-The generated SOP / Geometry Nodes graphs will not have identical
-topology. The semantic operations should match the documented slice.
+The scatter is **equivalent**. Houdini's random samples will not match Blender's. The script still builds a Scatter SOP and a Copy to Points SOP, which you can edit after running it.

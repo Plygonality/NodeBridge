@@ -1,55 +1,26 @@
-# Unreal Engine 5 host
+# Unreal Engine 5 backend
 
-Status: **peer host architecture implemented**. Frontend and backend
-exist. Live PCG editor integration is **experimental and editor-only**.
-CI uses construction-plan fixtures, not the Unreal editor.
+Generated scripts run inside the Unreal Editor with the Python Script Plugin. They are not a standalone "UE5 code window."
 
-Unreal is not a special terminal export target.
+## PCG
 
-```
-PCG graph  ↕  UnrealFrontend / UnrealBackend  ↕  Semantic IR
-```
+For Geometry Nodes the script:
 
-## API investigation (UE 5.7 experimental Python)
+1. Checks that `unreal.PCGGraphFactory` exists.
+2. Creates a PCG graph asset under `/Game/NodeBridge`.
+3. Checks that `add_node_of_type` exists, and raises if it does not.
+4. Adds documented settings classes such as `PCGSurfaceSamplerSettings`, `PCGStaticMeshSpawnerSettings`, and `PCGTransformPointsSettings`.
+5. Calls `add_edge` only for nodes that were actually created.
+6. Saves the asset.
 
-Documented on `unreal.PCGGraph` / `unreal.PCGNode`:
+Surface sampling is equivalent: the point set will not match Blender. Static mesh spawning is approximate. Extrude, subdivide, curves, raycast, proximity, and general math are unsupported and stay in the script as comments plus the translation report.
 
-* `add_node_of_type(settings_class)` — create a node
-* `add_edge(from, from_pin, to, to_pin)` — wire pins
-* `get_input_node()` / `get_output_node()`
-* `nodes`, `node.get_settings()`, `set_node_position`
+Pin names are the labels NodeBridge recorded. They are version-sensitive. The script does not probe private pin APIs.
 
-Known constraints:
+## Materials
 
-* The API is experimental and version-sensitive.
-* `add_edge` silently no-ops on wrong pin labels (Surface Sampler input
-  is `Surface`, not `In`; graph input output pin is `In`).
-* There is no reliable public `graph.edges` listing. Pin-edge traversal
-  is incomplete, so live *inspection* of links is limited.
-* Construction requires the Unreal editor; it cannot run in CI.
+Shader graphs use `AssetTools` and `MaterialEditingLibrary` to create a Material and expression nodes (`MaterialExpressionNoise`, `MaterialExpressionLinearInterpolate`, math expressions, texture sample, normal map). Principled BSDF is approximate. Noise does not match Blender.
 
-NodeBridge therefore:
+## Compositor
 
-* implements frontend/backend contracts and fixture mappings
-* emits construction plans without calling Unreal
-* emits script text that uses the documented 5.7 APIs
-* does **not** fabricate additional editor calls
-* classifies PCG spawning vs. Geometry Nodes instancing as APPROXIMATE
-
-## Vertical slice mappings
-
-| Semantic operation | PCG settings class | Fidelity |
-| --- | --- | --- |
-| `points.distribute` | `PCGSurfaceSamplerSettings` | EXACT |
-| `geometry.transform` | `PCGTransformPointsSettings` | EXACT |
-| `geometry.instance` | `PCGStaticMeshSpawnerSettings` | APPROXIMATE |
-| `geometry.realize_instances` | same spawner (no realize analogue) | APPROXIMATE |
-| `random.float` | `PCGAttributeNoiseSettings` | EXACT/APPROXIMATE |
-| `math.*` | none | UNSUPPORTED |
-
-Math and vector ops are unsupported on PCG rather than silently rewritten
-as Materials or Blueprints.
-
-## Isolation
-
-`unreal` is loaded via importlib from `hosts/unreal/runtime.py` only.
+The generated script raises `RuntimeError` and lists the source operations. It does not create a post-process material as a stand-in for the compositor.
