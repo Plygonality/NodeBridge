@@ -150,7 +150,10 @@ class PcgBuilder:
                 self.unsupported(op, f"Skipped by strictness ({self.options.strictness.value}).")
                 continue
             if item is None or classification.confidence == C.UNSUPPORTED:
-                self.unsupported(op, classification.explanation)
+                reason = classification.explanation
+                if classification.fallback:
+                    reason = f"{reason} {classification.fallback}"
+                self.unsupported(op, reason)
                 continue
             item.fn(self, op)
 
@@ -389,6 +392,10 @@ def _instance_classify(op, graph, base):
         return Classification(C.UNSUPPORTED, "The instanced geometry is procedural; PCG spawns Static Mesh assets.", "none", fallback="Convert the instance geometry to a Static Mesh asset and assign it on the spawner.")
     if source.kind != "PRIMITIVE" or source.params.get("shape") not in BASIC_SHAPES:
         limitations.append("Assign the matching Static Mesh asset on the spawner.")
+    else:
+        note = _engine_scale_note(source, chain, op)
+        if note:
+            limitations.append(note)
     if any(o.kind == "TRANSFORM" for o in chain):
         limitations.append("Translation / rotation applied to the instance geometry is dropped; scale is kept.")
     for key in ("rotation", "scale"):
@@ -446,23 +453,54 @@ def _instance(b: PcgBuilder, op: SemanticOp) -> None:
     b.set_output(op, "instances", spawner)
 
 
-def _primitive_scale(b: PcgBuilder, op: SemanticOp, unit_meters: float) -> list[float]:
+def _const_value(value, default):
+    if isinstance(value, Const) and value.value is not None:
+        return value.value
+    return default
+
+
+def _primitive_scale_values(op: SemanticOp, unit_meters: float, get) -> list[float]:
     shape = op.params.get("shape")
-    get = lambda key, default: b.const(op.inputs.get(key), default)  # noqa: E731
     if shape == "cube":
         size = get("size", [1.0, 1.0, 1.0])
         return [float(v) / unit_meters for v in size]
     if shape in ("uv_sphere", "ico_sphere"):
         return [2.0 * float(get("radius", 1.0)) / unit_meters] * 3
     if shape == "cylinder":
-        r = 2.0 * float(get("radius", 1.0))
-        return [r, r, float(get("depth", 2.0))]
+        radius = 2.0 * float(get("radius", 1.0))
+        return [radius, radius, float(get("depth", 2.0))]
     if shape == "cone":
-        r = 2.0 * max(float(get("radius_bottom", 1.0)), float(get("radius_top", 0.0)))
-        return [r, r, float(get("depth", 2.0))]
+        radius = 2.0 * max(float(get("radius_bottom", 1.0)), float(get("radius_top", 0.0)))
+        return [radius, radius, float(get("depth", 2.0))]
     if shape == "grid":
         return [float(get("size_x", 1.0)), float(get("size_y", 1.0)), 1.0]
     return [1.0, 1.0, 1.0]
+
+
+def _engine_scale_note(source: SemanticOp, chain: list, instance: SemanticOp) -> str:
+    """Record how a Blender primitive's size becomes an engine-mesh scale."""
+    unit = BASIC_SHAPES[source.params["shape"]][1]
+    if any(not isinstance(value, Const) for value in source.inputs.values()):
+        return ""
+    factor = _primitive_scale_values(source, unit, lambda key, default: _const_value(source.inputs.get(key), default))
+    for transform in (op for op in chain if op.kind == "TRANSFORM"):
+        scale = transform.inputs.get("scale")
+        if not isinstance(scale, Const):
+            return ""
+        values = scale.value if isinstance(scale.value, (list, tuple)) else [scale.value] * 3
+        factor = [component * float(item) for component, item in zip(factor, values)]
+    scale = instance.inputs.get("scale")
+    if isinstance(scale, Const):
+        values = scale.value if isinstance(scale.value, (list, tuple)) else [scale.value] * 3
+        factor = [component * float(item) for component, item in zip(factor, values)]
+    if all(abs(component - 1.0) <= 1e-6 for component in factor):
+        return ""
+    text = ", ".join(str(clean_number(component)) for component in factor)
+    return f"Engine mesh scale ({text}) matches the Blender size. Unreal basic shapes are 1 meter across."
+
+
+def _primitive_scale(b: PcgBuilder, op: SemanticOp, unit_meters: float) -> list[float]:
+    return _primitive_scale_values(op, unit_meters, lambda key, default: b.const(op.inputs.get(key), default))
 
 
 def _chain_classify(op, graph, base):

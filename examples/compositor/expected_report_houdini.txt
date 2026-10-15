@@ -11,32 +11,33 @@ Target:
 
 ✓ EXACT:        0
 ≈ EQUIVALENT:   1
-~ APPROXIMATE:  2
-✕ UNSUPPORTED:  2
+~ APPROXIMATE:  4
+✕ UNSUPPORTED:  0
 
 Operations:
   ~ APPROXIMATE Render Layers  RENDER_LAYER         -> file COP
-  ✕ UNSUPPORTED Bloom          GLARE                -> placeholder
+  ~ APPROXIMATE Bloom          GLARE                -> lumakey + bright + blur + over
   ~ APPROXIMATE Grade          COLOR_BALANCE        -> colorcorrect COP
-  ✕ UNSUPPORTED Vignette       VIGNETTE             -> placeholder
+  ~ APPROXIMATE Vignette       VIGNETTE             -> shape + blur + multiply
   ≈ EQUIVALENT  Composite      COMPOSITE_OUTPUT     -> null OUT (display)
-
-Unsupported:
-  Bloom (CompositorNodeGlare)
-    Reason: No NodeBridge translation is implemented for this operation on this target.
-    Fallback: A placeholder node with a note is generated so the network stays connected.
-  Vignette (CompositorNodeMixRGB, CompositorNodeEllipseMask, CompositorNodeBlur)
-    Reason: No NodeBridge translation is implemented for this operation on this target.
-    Fallback: A placeholder node with a note is generated so the network stays connected.
 
 Approximations:
   Render Layers (CompositorNodeRLayers)
     Reason: A rendered image is read from disk; Houdini has no Blender view layer.
     - Point the File COP at your rendered frames.
     - COP2 parameter names are not verified against a live Houdini session.
+  Bloom (CompositorNodeGlare)
+    Reason: COP2 has no Glare node. Bright pixels are keyed, brightened, blurred, and composited over the image (SideFX glow recipe).
+    - Streaks, ghosts, and fog glow all become the same soft glow.
+    - Glare quality is not translated.
+    - COP2 parameter names are not verified against a live Houdini session.
   Grade (CompositorNodeColorBalance)
     Reason: Lift / gamma / gain mapped onto Color Correct.
     - Blender's lift formula differs from COP2's.
+    - COP2 parameter names are not verified against a live Houdini session.
+  Vignette (CompositorNodeMixRGB, CompositorNodeEllipseMask, CompositorNodeBlur)
+    Reason: Ellipse mask, blur and multiply become a circle, a blur, and a multiply over the image.
+    - The falloff is a blurred circle, not a lens vignette profile.
     - COP2 parameter names are not verified against a live Houdini session.
 
 Equivalent (intent preserved, details differ):

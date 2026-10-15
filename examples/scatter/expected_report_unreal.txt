@@ -53,6 +53,7 @@ Approximations:
   Place Rocks (GeometryNodeInstanceOnPoints, GeometryNodeRotateInstances)
     Reason: Instance on Points becomes a Static Mesh Spawner; mesh primitives map to /Engine/BasicShapes meshes scaled to size.
     - Geometry Nodes instances arbitrary geometry; PCG spawns Static Mesh assets.
+    - Engine mesh scale (0.5, 0.5, 0.3) matches the Blender size. Unreal basic shapes are 1 meter across.
     - Translation / rotation applied to the instance geometry is dropped; scale is kept.
   Realize Instances (GeometryNodeRealizeInstances)
     Reason: PCG spawns instanced static mesh components; there is no 'realize' step.

@@ -129,13 +129,79 @@ def export_fixtures(directory, built):
         print("exported", path)
 
 
+def check_shared_panels():
+    node = getattr(bpy.types, "NODEBRIDGE_PT_main", None)
+    view = getattr(bpy.types, "NODEBRIDGE_PT_VIEW3D_main", None)
+    check(node is not None and node.bl_space_type == "NODE_EDITOR", "node editor panel is registered")
+    check(view is not None and view.bl_space_type == "VIEW_3D" and view.bl_category == "NodeBridge", "3D View panel is registered")
+    if node is None or view is None:
+        return
+    check(node.draw is view.draw, "main panels share one draw function")
+    for key in ("analysis", "warnings", "generate", "advanced"):
+        editor = getattr(bpy.types, f"NODEBRIDGE_PT_{key}")
+        viewport = getattr(bpy.types, f"NODEBRIDGE_PT_VIEW3D_{key}")
+        check(editor.draw is viewport.draw, f"{key} panels share one draw function")
+        check(editor.bl_parent_id == "NODEBRIDGE_PT_main", f"{key} stays under the node editor panel")
+        check(viewport.bl_parent_id == "NODEBRIDGE_PT_VIEW3D_main", f"{key} stays under the 3D View panel")
+
+
+def analyze_from_view3d(obj):
+    window = bpy.context.window_manager.windows[0] if bpy.context.window_manager.windows else None
+    area = next((item for item in (window.screen.areas if window else ()) if item.type == "VIEW_3D"), None)
+    check(area is not None, "the startup screen has a 3D Viewport")
+    if area is None:
+        return
+    region = next(item for item in area.regions if item.type == "WINDOW")
+    settings = bpy.context.scene.nodebridge
+    settings.source_type = "AUTO"
+    settings.target = "houdini"
+    with bpy.context.temp_override(window=window, area=area, region=region):
+        bpy.context.view_layer.objects.active = obj
+        result = bpy.ops.nodebridge.analyze()
+    check(result == {"FINISHED"}, "Analyze from the 3D View")
+    check(settings.analyzed_kind == "Geometry Nodes", f"3D View Auto uses the Geometry Nodes modifier ({settings.analyzed_kind})")
+    view_tree = settings.analyzed_tree
+    editor = None
+    editor_window = None
+    for win in bpy.context.window_manager.windows:
+        for item in win.screen.areas:
+            if item.type == "NODE_EDITOR":
+                editor, editor_window = item, win
+                break
+        if editor is not None:
+            break
+    if editor is None:
+        for win in bpy.context.window_manager.windows:
+            for item in win.screen.areas:
+                if item.type != "VIEW_3D":
+                    item.type = "NODE_EDITOR"
+                    editor, editor_window = item, win
+                    break
+            if editor is not None:
+                break
+    check(editor is not None, "a node editor area is available")
+    if editor is None:
+        return
+    region = next(item for item in editor.regions if item.type == "WINDOW")
+    space = editor.spaces.active
+    space.tree_type = "GeometryNodeTree"
+    space.pin = False
+    with bpy.context.temp_override(window=editor_window, area=editor, region=region):
+        bpy.context.view_layer.objects.active = obj
+        settings.source_type = "AUTO"
+        result = bpy.ops.nodebridge.analyze()
+    check(result == {"FINISHED"} and settings.analyzed_tree == view_tree, "node editor and 3D View analyze the same tree")
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     module, name = load_nodebridge()
     print("NodeBridge loaded from", name, "in Blender", bpy.app.version_string)
+    check_shared_panels()
     import build_examples
 
     built = build_examples.build_all()
+    analyze_from_view3d(built["ground"])
     if "--export-fixtures" in argv:
         export_fixtures(argv[argv.index("--export-fixtures") + 1], built)
     results = []
@@ -146,8 +212,13 @@ def main():
             continue
         results.append(run_case(f"scatter/{target}", "GEOMETRY", target, built["ground"], ("SCATTER", "RANDOM_TRANSFORM")))
         results.append(run_case(f"building/{target}", "GEOMETRY", target, built["building_object"], ("EXTRUDE",)))
+        if target == "unreal":
+            messages = [item.text for item in bpy.context.scene.nodebridge.messages]
+            check(any("PCG does not model meshes" in text for text in messages), "building report explains the PCG mesh gap")
         results.append(run_case(f"shader/{target}", "SHADER", target, built["ground"], ("SHADER_BSDF",)))
         results.append(run_case(f"compositor/{target}", "COMPOSITOR", target, None, ("GLARE",)))
+        if target == "houdini":
+            check(bpy.context.scene.nodebridge.unsupported == 0, "compositor example has no unsupported Houdini operations")
     print("NODEBRIDGE_RESULTS " + json.dumps(results))
     if FAILURES:
         print(f"{len(FAILURES)} FAILURE(S)")

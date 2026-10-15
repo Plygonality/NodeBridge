@@ -19,7 +19,7 @@ bl_info = {
     "author": "NodeBridge Contributors",
     "version": (0, 3, 0),
     "blender": (4, 2, 0),
-    "location": "Node Editor > Sidebar (N) > NodeBridge",
+    "location": "3D View and Node Editor > Sidebar (N) > NodeBridge",
     "description": "Compile Geometry, Shader and Compositor node trees into native Houdini or Unreal Engine 5 code.",
     "category": "Node",
 }
