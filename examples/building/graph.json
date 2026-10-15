@@ -1,0 +1,899 @@
+{
+  "__type__": "NodeTree",
+  "edges": [
+    {
+      "__type__": "GraphEdge",
+      "from_node": "footprint",
+      "from_socket": "Mesh",
+      "id": "e0",
+      "to_node": "walls",
+      "to_socket": "Mesh"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "group_input",
+      "from_socket": "Height",
+      "id": "e1",
+      "to_node": "walls",
+      "to_socket": "Offset Scale"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "walls",
+      "from_socket": "Mesh",
+      "id": "e2",
+      "to_node": "floors",
+      "to_socket": "Mesh"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "floors",
+      "from_socket": "Mesh",
+      "id": "e3",
+      "to_node": "facade_points",
+      "to_socket": "Mesh"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "group_input",
+      "from_socket": "Density",
+      "id": "e4",
+      "to_node": "facade_points",
+      "to_socket": "Density"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "facade_points",
+      "from_socket": "Points",
+      "id": "e5",
+      "to_node": "facade_instances",
+      "to_socket": "Points"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "facade_panel",
+      "from_socket": "Mesh",
+      "id": "e6",
+      "to_node": "facade_instances",
+      "to_socket": "Instance"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "panel_scale",
+      "from_socket": "Value",
+      "id": "e7",
+      "to_node": "facade_instances",
+      "to_socket": "Scale"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "facade_instances",
+      "from_socket": "Instances",
+      "id": "e8",
+      "to_node": "realize_facade",
+      "to_socket": "Geometry"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "floors",
+      "from_socket": "Mesh",
+      "id": "e9",
+      "to_node": "join_building",
+      "to_socket": "Geometry"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "realize_facade",
+      "from_socket": "Geometry",
+      "id": "e10",
+      "to_node": "join_building",
+      "to_socket": "Geometry"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "join_building",
+      "from_socket": "Geometry",
+      "id": "e11",
+      "to_node": "group_output",
+      "to_socket": "Geometry"
+    }
+  ],
+  "id": "buildinggenerator",
+  "interface": [
+    {
+      "__type__": "InterfaceSocket",
+      "data_type": "float",
+      "default": 3.0,
+      "description": "",
+      "direction": "input",
+      "identifier": "Height",
+      "is_field": false,
+      "maximum": null,
+      "minimum": null,
+      "name": "Height"
+    },
+    {
+      "__type__": "InterfaceSocket",
+      "data_type": "float",
+      "default": 4.0,
+      "description": "",
+      "direction": "input",
+      "identifier": "Density",
+      "is_field": false,
+      "maximum": null,
+      "minimum": null,
+      "name": "Density"
+    }
+  ],
+  "ir_version": "1.0",
+  "metadata": {
+    "source": "blender"
+  },
+  "name": "BuildingGenerator",
+  "nodes": [
+    {
+      "__type__": "GraphNode",
+      "id": "group_input",
+      "inputs": [],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Group Input",
+      "nested": null,
+      "node_type": "NodeGroupInput",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 3.0,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Height",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Height"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 4.0,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Density",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Density"
+        }
+      ],
+      "parameters": [],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "footprint",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 8.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Size X",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Size X"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 8.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Size Y",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Size Y"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "int",
+          "default": 4,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Vertices X",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Vertices X"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "int",
+          "default": 4,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Vertices Y",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Vertices Y"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Footprint",
+      "nested": null,
+      "node_type": "GeometryNodeMeshGrid",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Mesh",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mesh"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Size X",
+          "name": "Size X",
+          "value": 8.0
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Size Y",
+          "name": "Size Y",
+          "value": 8.0
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "int",
+          "exposed": false,
+          "identifier": "Vertices X",
+          "name": "Vertices X",
+          "value": 4
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "int",
+          "exposed": false,
+          "identifier": "Vertices Y",
+          "name": "Vertices Y",
+          "value": 4
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "walls",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Mesh",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mesh"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "vector3",
+          "default": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Offset",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Offset"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 3.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Offset Scale",
+          "is_field": true,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Offset Scale"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Walls",
+      "nested": null,
+      "node_type": "GeometryNodeExtrudeMesh",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Mesh",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mesh"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "vector3",
+          "exposed": false,
+          "identifier": "Offset",
+          "name": "Offset",
+          "value": [
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Offset Scale",
+          "name": "Offset Scale",
+          "value": 3.0
+        }
+      ],
+      "properties": {
+        "mode": "FACES"
+      }
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "floors",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Mesh",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mesh"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "int",
+          "default": 2,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Level",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Level"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Floors",
+      "nested": null,
+      "node_type": "GeometryNodeSubdivideMesh",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Mesh",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mesh"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "int",
+          "exposed": false,
+          "identifier": "Level",
+          "name": "Level",
+          "value": 2
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "facade_points",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Mesh",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mesh"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 4.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Density",
+          "is_field": true,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Density"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "int",
+          "default": 5,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Seed",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Seed"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Facade Points",
+      "nested": null,
+      "node_type": "GeometryNodeDistributePointsOnFaces",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Points",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Points"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Density",
+          "name": "Density",
+          "value": 4.0
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "int",
+          "exposed": false,
+          "identifier": "Seed",
+          "name": "Seed",
+          "value": 5
+        }
+      ],
+      "properties": {
+        "distribute_method": "RANDOM"
+      }
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "facade_panel",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "vector3",
+          "default": [
+            0.6,
+            0.08,
+            0.8
+          ],
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Size",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Size"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Facade Panel",
+      "nested": null,
+      "node_type": "GeometryNodeMeshCube",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Mesh",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mesh"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "vector3",
+          "exposed": false,
+          "identifier": "Size",
+          "name": "Size",
+          "value": [
+            0.6,
+            0.08,
+            0.8
+          ]
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "panel_scale",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 0.7,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Min",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Min"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 1.3,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Max",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Max"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "int",
+          "default": 9,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Seed",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Seed"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Panel Scale",
+      "nested": null,
+      "node_type": "FunctionNodeRandomValue",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Value",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Value"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Min",
+          "name": "Min",
+          "value": 0.7
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Max",
+          "name": "Max",
+          "value": 1.3
+        },
+        {
+          "__type__": "NodeParameter",
+          "data_type": "int",
+          "exposed": false,
+          "identifier": "Seed",
+          "name": "Seed",
+          "value": 9
+        }
+      ],
+      "properties": {
+        "data_type": "FLOAT"
+      }
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "facade_instances",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Points",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Points"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Instance",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Instance"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "vector3",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Scale",
+          "is_field": true,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Scale"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Facade Instances",
+      "nested": null,
+      "node_type": "GeometryNodeInstanceOnPoints",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Instances",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Instances"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "vector3",
+          "exposed": false,
+          "identifier": "Scale",
+          "name": "Scale",
+          "value": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "realize_facade",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Geometry",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Geometry"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Realize Facade",
+      "nested": null,
+      "node_type": "GeometryNodeRealizeInstances",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Geometry",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Geometry"
+        }
+      ],
+      "parameters": [],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "join_building",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Geometry",
+          "is_field": false,
+          "is_multi_input": true,
+          "metadata": {},
+          "name": "Geometry"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Join Building",
+      "nested": null,
+      "node_type": "GeometryNodeJoinGeometry",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Geometry",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Geometry"
+        }
+      ],
+      "parameters": [],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "group_output",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "geometry",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Geometry",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Geometry"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Group Output",
+      "nested": null,
+      "node_type": "NodeGroupOutput",
+      "outputs": [],
+      "parameters": [],
+      "properties": {}
+    }
+  ],
+  "system": "geometry_nodes"
+}

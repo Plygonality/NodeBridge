@@ -1,235 +1,323 @@
-"""Parse Blender node trees into graph IR.
+"""Parse a Blender node tree into graph IR.
 
-The parser accepts live ``bpy`` node trees and duck-typed stand-ins with
-``nodes`` and ``links``. It does not import ``bpy``. Nested node groups are
-parsed recursively and kept as child trees.
+The parser uses attribute access, so the same code reads a live ``bpy``
+node tree and a duck-typed fixture. It does not evaluate the node tree and
+it does not import ``bpy`` at module import time.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from nodebridge.frontend.base import SourceFrontend
-from nodebridge.ir.graph_ir import GraphEdge, GraphNode, GraphSocket, NodeParameter, NodeTree
-
-_GROUP_TYPES = {
-    "GeometryNodeGroup",
-    "ShaderNodeGroup",
-    "CompositorNodeGroup",
-    "NodeGroup",
-}
-_PARAM_ATTRS = (
-    "operation",
-    "data_type",
-    "domain",
-    "mode",
-    "blend_type",
-    "distribute_method",
-    "use_clamp",
-    "interpolation_type",
-    "clamp_result",
-    "noise_dimensions",
-    "musgrave_type",
-    "component",
+from nodebridge.common.names import unique_name
+from nodebridge.frontend.blender.sockets import is_field_socket, pythonize, socket_data_type
+from nodebridge.ir.graph import (
+    GraphEdge,
+    GraphNode,
+    GraphSocket,
+    GraphSystem,
+    InterfaceSocket,
+    NodeParameter,
+    NodeTree,
+    SocketDirection,
 )
-_REFERENCE_ATTRS = ("object", "collection", "material", "image")
-_SYSTEM_BY_TREE = {
-    "GeometryNodeTree": "geometry_nodes",
-    "ShaderNodeTree": "shader",
-    "CompositorNodeTree": "compositor",
+from nodebridge.ir.types import DataType, data_type_from_blender_socket
+
+_PROPERTY_NAMES = (
+    "operation",
+    "distribute_method",
+    "data_type",
+    "mode",
+    "domain",
+    "noise_dimensions",
+    "noise_type",
+    "blend_type",
+    "use_clamp",
+    "clamp_result",
+    "interpolation_type",
+    "fill_type",
+    "component",
+    "input_type",
+    "output_type",
+    "mapping",
+    "boolean_mode",
+    "material_mode",
+    "target_element",
+    "data_type",
+    "scatter_method",
+)
+
+_TREE_SYSTEMS = {
+    "GeometryNodeTree": GraphSystem.GEOMETRY,
+    "ShaderNodeTree": GraphSystem.SHADER,
+    "CompositorNodeTree": GraphSystem.COMPOSITOR,
 }
 
-
-class BlenderFrontend:
-    """:class:`SourceFrontend` for Blender node trees."""
-
-    application = "blender"
-
-    def parse(self, source: Any, *, system: str | None = None) -> NodeTree:
-        return parse_node_tree(source, system=system)
+_GROUP_TYPES = {"GeometryNodeGroup", "ShaderNodeGroup", "CompositorNodeGroup"}
 
 
-def parse_node_tree(tree: Any, *, system: str | None = None, _seen: set[int] | None = None) -> NodeTree:
-    """Parse one node tree and any nested groups."""
-    nodes_attr = getattr(tree, "nodes", None)
-    links_attr = getattr(tree, "links", None)
-    if nodes_attr is None or links_attr is None:
-        raise ValueError("Blender source has no nodes/links collections")
-    seen = set() if _seen is None else _seen
-    identity = id(tree)
-    tree_type = str(getattr(tree, "bl_idname", "") or "")
-    resolved = system or _SYSTEM_BY_TREE.get(tree_type, "geometry_nodes")
-    name = str(getattr(tree, "name", None) or "NodeTree")
-    tree_id = _identifier(name, fallback="tree")
-    if identity in seen:
-        return NodeTree(id=tree_id, name=name, system=resolved, metadata={"recursive": True})
-    seen.add(identity)
-
-    node_tree = NodeTree(id=tree_id, name=name, system=resolved)
-    node_tree.interface_inputs, node_tree.interface_outputs = _interface(tree)
-    index = 0
-    for node in nodes_attr:
-        index += 1
-        parsed = _node(node, index)
-        if parsed is None:
-            continue
-        if parsed.type_name in _GROUP_TYPES:
-            child_source = getattr(node, "node_tree", None)
-            if child_source is not None and id(child_source) not in seen:
-                child = parse_node_tree(child_source, _seen=seen)
-                node_tree.groups[child.id] = child
-                parsed.nested_tree_id = child.id
-                parsed.parameters.append(NodeParameter("nested_graph_id", child.id, "string"))
-        node_tree.nodes[parsed.id] = parsed
-
-    edge_index = 0
-    for link in links_attr:
-        edge_index += 1
-        edge = _edge(link, edge_index, node_tree)
-        if edge is not None:
-            node_tree.edges.append(edge)
-    return node_tree
-
-
-def _node(node: Any, index: int) -> GraphNode | None:
-    type_name = str(getattr(node, "bl_idname", "") or getattr(node, "type", "") or "")
-    if not type_name:
+def system_for_tree_id(bl_idname: str | None) -> GraphSystem | None:
+    if bl_idname is None:
         return None
-    raw_name = str(getattr(node, "name", "") or f"Node_{index}")
-    node_id = _identifier(raw_name, fallback=f"node_{index}")
-    location = getattr(node, "location", None)
-    parsed_location = None
-    if location is not None and len(location) >= 2:
-        parsed_location = (float(location[0]), float(location[1]))
-    graph_node = GraphNode(
-        id=node_id,
-        type_name=type_name,
-        name=raw_name,
-        label=str(getattr(node, "label", "") or ""),
-        inputs=_sockets(getattr(node, "inputs", []), "input"),
-        outputs=_sockets(getattr(node, "outputs", []), "output"),
-        parameters=_parameters(node),
-        location=parsed_location,
-        muted=bool(getattr(node, "mute", False)),
-    )
-    return graph_node
+    return _TREE_SYSTEMS.get(bl_idname)
 
 
-def _sockets(items: Any, direction: str) -> list[GraphSocket]:
-    sockets: list[GraphSocket] = []
-    for item in items:
-        name = str(getattr(item, "name", "") or "")
-        if not name:
+def parse_blender_tree(source: Any, *, system: GraphSystem | None = None, _stack: tuple[int, ...] = ()) -> NodeTree:
+    """Parse ``source`` as a node tree or a Geometry Nodes modifier."""
+
+    modifier_name = None
+    if _is_modifier(source):
+        modifier_name = getattr(source, "name", None)
+        group = getattr(source, "node_group", None)
+        if group is None:
+            raise ValueError("Geometry Nodes modifier has no node group")
+        tree = parse_blender_tree(group, system=GraphSystem.GEOMETRY, _stack=_stack)
+        _apply_modifier_values(source, tree)
+        tree.metadata["modifier"] = modifier_name
+        owner = getattr(source, "id_data", None)
+        if owner is not None and getattr(owner, "name", None):
+            tree.metadata["object"] = owner.name
+        return tree
+
+    resolved = system or system_for_tree_id(getattr(source, "bl_idname", None)) or _system_from_nodes(source)
+    if resolved is None:
+        raise ValueError("Could not tell whether this node tree is geometry, shader, or compositor")
+
+    identity = id(source)
+    if identity in _stack:
+        return NodeTree(
+            id="recursive_group",
+            name=str(getattr(source, "name", "Group")),
+            system=resolved,
+            metadata={"recursive": True},
+        )
+
+    used: set[str] = set()
+    nodes: list[GraphNode] = []
+    id_by_node: dict[int, str] = {}
+    for native in list(getattr(source, "nodes", [])):
+        node_id = unique_name(str(getattr(native, "name", "node")), used)
+        graph_node = _parse_node(native, node_id, resolved, _stack + (identity,))
+        nodes.append(graph_node)
+        id_by_node[id(native)] = node_id
+
+    edges: list[GraphEdge] = []
+    for index, link in enumerate(list(getattr(source, "links", []))):
+        from_node = getattr(link, "from_node", None)
+        to_node = getattr(link, "to_node", None)
+        if from_node is None or to_node is None:
             continue
-        default = getattr(item, "default_value", None)
-        if hasattr(default, "name") and not isinstance(default, (str, bytes)):
-            default = str(default.name)
-        elif hasattr(default, "__iter__") and not isinstance(default, (str, bytes)):
-            try:
-                default = [float(component) for component in default]
-            except (TypeError, ValueError):
-                default = None
-        elif isinstance(default, (bool, int, float, str)) or default is None:
-            pass
-        else:
-            default = None
-        data_type = str(getattr(item, "bl_idname", "") or getattr(item, "type", "") or "unknown")
-        sockets.append(GraphSocket(name=name, direction=direction, data_type=data_type, default=default))
-    return sockets
-
-
-def _parameters(node: Any) -> list[NodeParameter]:
-    parameters: list[NodeParameter] = []
-    for attr in _PARAM_ATTRS:
-        if not hasattr(node, attr):
+        if not getattr(link, "is_valid", True):
             continue
-        value = getattr(node, attr)
-        if isinstance(value, (bool, int, float, str)):
-            parameters.append(NodeParameter(attr, value))
-    for attr in _REFERENCE_ATTRS:
-        value = getattr(node, attr, None)
-        if value is None:
+        from_id = id_by_node.get(id(from_node))
+        to_id = id_by_node.get(id(to_node))
+        if from_id is None or to_id is None:
             continue
-        name = getattr(value, "name", None)
-        if isinstance(name, str) and name:
-            parameters.append(NodeParameter(attr, name, "reference"))
-    return parameters
-
-
-def _interface(tree: Any) -> tuple[list[GraphSocket], list[GraphSocket]]:
-    inputs: list[GraphSocket] = []
-    outputs: list[GraphSocket] = []
-    interface = getattr(tree, "interface", None)
-    items = getattr(interface, "items_tree", None) if interface is not None else None
-    if items is not None:
-        for item in items:
-            if str(getattr(item, "item_type", "") or "") not in {"SOCKET", ""}:
-                if getattr(item, "socket_type", None) is None and getattr(item, "in_out", None) is None:
-                    continue
-            if getattr(item, "in_out", None) is None and getattr(item, "socket_type", None) is None:
-                continue
-            direction = str(getattr(item, "in_out", "") or "")
-            socket = GraphSocket(
-                name=str(getattr(item, "name", "") or "Socket"),
-                direction="input" if direction.upper().startswith("IN") else "output",
-                data_type=str(getattr(item, "socket_type", "") or "unknown"),
-                default=_plain(getattr(item, "default_value", None)),
+        edges.append(
+            GraphEdge(
+                id=f"e{index}",
+                from_node=from_id,
+                from_socket=_socket_identifier(getattr(link, "from_socket", None)),
+                to_node=to_id,
+                to_socket=_socket_identifier(getattr(link, "to_socket", None)),
             )
-            if socket.direction == "input":
-                inputs.append(socket)
-            else:
-                outputs.append(socket)
-        if inputs or outputs:
-            return inputs, outputs
-    for item in getattr(tree, "inputs", []) or []:
-        name = str(getattr(item, "name", "") or "")
-        if name:
-            inputs.append(GraphSocket(name=name, direction="input", data_type=str(getattr(item, "bl_idname", "") or "unknown")))
-    for item in getattr(tree, "outputs", []) or []:
-        name = str(getattr(item, "name", "") or "")
-        if name:
-            outputs.append(
-                GraphSocket(name=name, direction="output", data_type=str(getattr(item, "bl_idname", "") or "unknown"))
-            )
-    return inputs, outputs
+        )
 
-
-def _edge(link: Any, index: int, tree: NodeTree) -> GraphEdge | None:
-    source = getattr(link, "from_node", None)
-    target = getattr(link, "to_node", None)
-    source_socket = getattr(link, "from_socket", None)
-    target_socket = getattr(link, "to_socket", None)
-    if source is None or target is None:
-        return None
-    source_id = _identifier(str(getattr(source, "name", "") or ""), fallback="")
-    target_id = _identifier(str(getattr(target, "name", "") or ""), fallback="")
-    if source_id not in tree.nodes or target_id not in tree.nodes:
-        return None
-    return GraphEdge(
-        id=f"edge_{index}",
-        source_node=source_id,
-        source_socket=str(getattr(source_socket, "name", "") or "Geometry"),
-        target_node=target_id,
-        target_socket=str(getattr(target_socket, "name", "") or "Geometry"),
+    tree = NodeTree(
+        id=unique_name(str(getattr(source, "name", "node_tree")), set()),
+        name=str(getattr(source, "name", "Node Tree")),
+        system=resolved,
+        nodes=nodes,
+        edges=edges,
+        interface=_parse_interface(source),
+        metadata={"source": "blender"},
     )
+    if modifier_name:
+        tree.metadata["modifier"] = modifier_name
+    return tree
 
 
-def _plain(value: Any) -> Any:
-    if isinstance(value, (bool, int, float, str)) or value is None:
-        return value
-    if hasattr(value, "__iter__") and not isinstance(value, (str, bytes)):
-        try:
-            return [float(component) for component in value]
-        except (TypeError, ValueError):
-            return None
+def _is_modifier(source: Any) -> bool:
+    return getattr(source, "node_group", None) is not None and hasattr(source, "type") and not hasattr(source, "nodes")
+
+
+def _system_from_nodes(source: Any) -> GraphSystem | None:
+    types = {getattr(node, "bl_idname", "") for node in list(getattr(source, "nodes", []))}
+    if "ShaderNodeOutputMaterial" in types or "ShaderNodeBsdfPrincipled" in types:
+        return GraphSystem.SHADER
+    if "CompositorNodeComposite" in types or "CompositorNodeRLayers" in types:
+        return GraphSystem.COMPOSITOR
+    if types:
+        return GraphSystem.GEOMETRY
     return None
 
 
-def _identifier(value: str, *, fallback: str) -> str:
-    cleaned = "".join(character if character.isalnum() or character in "_.-" else "_" for character in value)
-    cleaned = cleaned.strip("_.-")
-    if not cleaned:
-        cleaned = fallback
-    if not cleaned or not cleaned[0].isalpha():
-        cleaned = f"n_{cleaned}" if cleaned else fallback
-    return cleaned
+def _parse_node(native: Any, node_id: str, system: GraphSystem, stack: tuple[int, ...]) -> GraphNode:
+    location = getattr(native, "location", None)
+    point = None
+    if location is not None:
+        try:
+            point = (float(location[0]), float(location[1]))
+        except (TypeError, IndexError, ValueError):
+            point = None
+    node_type = str(getattr(native, "bl_idname", "Unknown"))
+    nested = None
+    if node_type in _GROUP_TYPES and getattr(native, "node_tree", None) is not None:
+        nested = parse_blender_tree(native.node_tree, system=system, _stack=stack)
+    return GraphNode(
+        id=node_id,
+        name=str(getattr(native, "name", node_id)),
+        node_type=node_type,
+        inputs=[_parse_socket(socket, SocketDirection.INPUT) for socket in list(getattr(native, "inputs", []))],
+        outputs=[_parse_socket(socket, SocketDirection.OUTPUT) for socket in list(getattr(native, "outputs", []))],
+        parameters=_parameters(native),
+        location=point,
+        mute=bool(getattr(native, "mute", False)),
+        label=str(getattr(native, "label", "") or ""),
+        nested=nested,
+        properties=_properties(native),
+    )
+
+
+def _parse_socket(socket: Any, direction: SocketDirection) -> GraphSocket:
+    identifier = _socket_identifier(socket)
+    return GraphSocket(
+        identifier=identifier,
+        name=str(getattr(socket, "name", identifier)),
+        direction=direction,
+        data_type=socket_data_type(socket),
+        default=pythonize(getattr(socket, "default_value", None)),
+        is_field=is_field_socket(socket),
+        is_multi_input=bool(getattr(socket, "is_multi_input", False)),
+        enabled=bool(getattr(socket, "enabled", True)),
+    )
+
+
+def _socket_identifier(socket: Any) -> str:
+    if socket is None:
+        return ""
+    identifier = getattr(socket, "identifier", None) or getattr(socket, "name", "")
+    return str(identifier)
+
+
+def _parameters(native: Any) -> list[NodeParameter]:
+    found = []
+    for socket in list(getattr(native, "inputs", [])):
+        if getattr(socket, "is_linked", False):
+            continue
+        default = pythonize(getattr(socket, "default_value", None))
+        if default is None:
+            continue
+        identifier = _socket_identifier(socket)
+        found.append(
+            NodeParameter(
+                name=str(getattr(socket, "name", identifier)),
+                value=default,
+                data_type=socket_data_type(socket),
+                identifier=identifier,
+            )
+        )
+    return found
+
+
+def _properties(native: Any) -> dict[str, Any]:
+    properties: dict[str, Any] = {}
+    for name in _PROPERTY_NAMES:
+        if not hasattr(native, name):
+            continue
+        value = getattr(native, name)
+        if isinstance(value, (str, int, float, bool)):
+            properties[name] = value
+    ramp = getattr(native, "color_ramp", None)
+    if ramp is not None and hasattr(ramp, "elements"):
+        properties["color_ramp"] = [
+            {"position": float(element.position), "color": pythonize(element.color)}
+            for element in list(ramp.elements)
+        ]
+    return properties
+
+
+def _parse_interface(source: Any) -> list[InterfaceSocket]:
+    items = _interface_items(source)
+    sockets = []
+    for item in items:
+        item_type = str(getattr(item, "item_type", "SOCKET")).upper()
+        if item_type not in {"SOCKET", ""}:
+            continue
+        raw_direction = str(getattr(item, "in_out", getattr(item, "direction", "INPUT"))).upper()
+        direction = SocketDirection.OUTPUT if raw_direction == "OUTPUT" else SocketDirection.INPUT
+        socket_type = str(getattr(item, "socket_type", "") or getattr(item, "bl_socket_idname", "") or "")
+        identifier = str(getattr(item, "identifier", "") or getattr(item, "name", "Socket"))
+        sockets.append(
+            InterfaceSocket(
+                identifier=identifier,
+                name=str(getattr(item, "name", identifier)),
+                direction=direction,
+                data_type=data_type_from_blender_socket(socket_type) if socket_type else _declared_type(item),
+                default=pythonize(getattr(item, "default_value", None)),
+                minimum=pythonize(getattr(item, "min_value", None)),
+                maximum=pythonize(getattr(item, "max_value", None)),
+                description=str(getattr(item, "description", "") or ""),
+            )
+        )
+    return sockets
+
+
+def _interface_items(source: Any) -> list[Any]:
+    interface = getattr(source, "interface", None)
+    if interface is not None and hasattr(interface, "items_tree"):
+        return list(interface.items_tree)
+    if hasattr(source, "interface_sockets"):
+        return list(source.interface_sockets)
+    legacy = []
+    for socket in list(getattr(source, "inputs", [])):
+        setattr_direction(socket, "INPUT")
+        legacy.append(socket)
+    for socket in list(getattr(source, "outputs", [])):
+        setattr_direction(socket, "OUTPUT")
+        legacy.append(socket)
+    return legacy
+
+
+def setattr_direction(socket: Any, direction: str) -> None:
+    if not hasattr(socket, "in_out"):
+        try:
+            socket.in_out = direction
+        except AttributeError:
+            socket.direction = direction
+
+
+def _declared_type(item: Any) -> DataType:
+    declared = getattr(item, "data_type", None)
+    if isinstance(declared, DataType):
+        return declared
+    if isinstance(declared, str):
+        try:
+            return DataType(declared)
+        except ValueError:
+            return data_type_from_blender_socket(declared)
+    return DataType.ANY
+
+
+def _apply_modifier_values(modifier: Any, tree: NodeTree) -> None:
+    """Copy Geometry Nodes modifier values over the group defaults."""
+
+    for item in tree.interface:
+        if item.direction is not SocketDirection.INPUT:
+            continue
+        value = _modifier_value(modifier, item.identifier)
+        if value is None:
+            value = _modifier_value(modifier, item.name)
+        if value is not None:
+            item.default = value
+
+
+def _modifier_value(modifier: Any, key: str) -> Any:
+    getter = getattr(modifier, "get", None)
+    if callable(getter):
+        try:
+            if key in modifier:
+                return pythonize(modifier[key])
+        except (KeyError, TypeError, AttributeError):
+            return None
+    return None

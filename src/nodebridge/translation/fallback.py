@@ -1,26 +1,19 @@
-"""Optional translation fallback.
+"""Optional fallback when the compiler has no target implementation.
 
-The compiler does not call an LLM. ``fallback`` is ``None`` unless a later
-integration supplies a :class:`TranslationFallbackProvider`. A provider may
-only return an explanation string. It must not be required for generation.
+The default provider is ``None``. Graph translation does not call an LLM,
+a cloud API, or any local model. A later provider can implement this
+interface and return a comment. The compiler will not execute that text.
 """
 
 from __future__ import annotations
 
 from typing import Protocol
 
+from nodebridge.ir.semantic import Operation
+
 
 class TranslationFallbackProvider(Protocol):
-    """Suggest a human-readable note for an operation a backend cannot lower."""
+    """Suggest a human-readable fallback for an unsupported operation."""
 
-    def suggest(self, operation: str, target: str, *, note: str = "") -> str | None:
-        """Return an explanation, or ``None`` to leave the diagnostic unchanged."""
-        ...
-
-
-class NullFallback:
-    """The default provider. It never invents a translation."""
-
-    def suggest(self, operation: str, target: str, *, note: str = "") -> str | None:
-        del operation, target, note
-        return None
+    def suggest(self, operation: Operation, target: str, reason: str) -> str | None:
+        """Return a comment, or ``None`` when there is nothing to add."""

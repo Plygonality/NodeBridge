@@ -1,95 +1,79 @@
 # Architecture
 
-NodeBridge is a compiler. Parsing, meaning, and target code stay separate.
+NodeBridge is a cross-DCC procedural compiler. It translates procedural meaning. Source node names are syntax. The semantic IR is the meaning. A target backend chooses a native implementation.
 
 ```
 Blender node tree
-        │
-        ▼
-BlenderFrontend.parse          graph IR (structure)
-        │
-        ▼
-analyze_dependencies           order, cycles, dead nodes, branches
-        │
-        ▼
-semanticize                    semantic IR (operations)
-        │
-        ▼
-normalize / rewrite rules      smaller semantic graph
-        │
-        ▼
-capability + confidence        exact, equivalent, approximate, unsupported
-        │
-        ▼
-HoudiniBackend / UnrealBackend generated Python
-        │
-        ▼
-native SOP, MaterialX, COP, PCG, or Material graph
+        |
+        v
+  Blender parser          frontend/blender/parser.py
+        |
+        v
+     Graph IR             ir/graph.py
+        |
+        v
+ Dependency analysis      compiler/analyzer.py
+        |
+        v
+    Semantic IR           ir/semantic.py
+        |
+        v
+ Normalization            compiler/normalize.py
+ Graph rewrite rules      compiler/rewrite.py
+        |
+        v
+ Capability resolver      translation/registry.py
+                          compiler/capabilities.py
+        |
+        v
+   Target backend         backend/houdini, backend/unreal
+        |
+        v
+  Generated Python
+        |
+        v
+ Native DCC graph         SOP network, material, COP network, PCG graph, Unreal material
 ```
-
-The rule: **do not translate node names. Translate procedural meaning.**
-
-`GeometryNodeDistributePointsOnFaces` is metadata on a graph-IR node. The semantic operation is `points.distribute`. The Houdini backend chooses a Scatter SOP. The Unreal backend chooses a Surface Sampler. Those choices are recipes, not the identity of the IR.
 
 ## Two representations
 
-### Graph IR (`nodebridge.ir.graph_ir`)
+Graph IR keeps nodes, sockets, links, defaults, nested groups, and the source node type as metadata. Editor coordinates are stored and then ignored by ordering.
 
-Preserves structure:
+Semantic IR names operations such as `ScatterOperation` data on an `Operation` whose `kind` is `scatter`. The Blender node `GeometryNodeDistributePointsOnFaces` is a source reference, not the translation key.
 
-- `NodeTree`, `GraphNode`, `GraphSocket`, `GraphEdge`, `NodeParameter`
-- node ids, names, source type names, defaults, nested groups
-- JSON serialization for debugging
+Several source nodes can become one semantic operation. `Noise -> Map Range -> Compare` can become `spatial_noise_mask` when the chain has no other consumers. Rewrite rules live in `compiler/rewrite.py` and are the place to add the next pattern.
 
-Editor coordinates are optional metadata. Ordering comes from links.
+## What generates code
 
-### Semantic IR (`nodebridge.core`)
+Translators register themselves:
 
-Preserves meaning:
+```python
+@translator(OperationKind.SCATTER, "houdini", confidence=Confidence.EQUIVALENT, ...)
+def translate_scatter(operation, build):
+    ...
+```
 
-- `geometry.transform`, `points.distribute`, `geometry.instance`, `procedural.noise`
-- sockets, parameters, nested graphs, provenance
+There is no central `if node.type` cascade. `TranslationFallbackProvider` exists for a future optional comment source. The default is `None`. Compilation does not call an LLM or a network API.
 
-The source Blender type is stored on the node as provenance. Backends are not allowed to treat that string as the operation.
+## Confidence
 
-## Rewrite rules
+| Class | Meaning |
+| --- | --- |
+| Exact | The target should follow the source very closely. |
+| Equivalent | The procedural intention is preserved. Samples, topology, or noise can differ. |
+| Approximate | A similar result, not the full source behavior. |
+| Unsupported | No reliable target implementation. The operation stays in the report and in the script as a comment or passthrough. |
 
-`nodebridge.compiler.rules` is a pass pipeline, not a hardcoded pair of examples.
-
-- `CollapseReroutePass` deletes reroutes and reconnects neighbors.
-- `FuseClampPass` turns min/max pairs into `math.clamp`.
-- `SpatialNoiseMaskPass` fuses noise → map range → compare into `selection.spatial_noise` when each step has a single consumer.
-- `FuseInstanceTransformPass` folds Rotate Instances and Scale Instances into the preceding Instance operation.
-
-A rule that cannot match leaves the graph unchanged.
-
-## Backends
-
-`TargetBackend` is the host backend: `implementation_for`, `lower_node`, `build`, `generate`.
-
-`HoudiniBackend` writes SOP Python, and switches to a Material Builder or a COP2 network from the graph system. `UnrealBackend` writes PCG Python, Material Editor Python, or an explicit compositor refusal.
-
-Recipes are data (`Recipe`, `NodeTemplate`) registered on the host. They are not a single `if node.type` chain.
+The capability matrix is default translator metadata. A translator may downgrade one node. The translation report for that graph is the authority.
 
 ## Shared conversions
 
-| Module | Responsibility |
-| --- | --- |
-| `nodebridge.common.coordinates` | Handedness, up axis, position, normal, scale, Euler, UV |
-| `nodebridge.common.units` | Meters, centimeters, radians, degrees, frames |
-| `nodebridge.common.random` | `random_unit(seed, element_id)` and the VEX port |
-| `nodebridge.common.names` | `Building Scatter` → `building_scatter` |
+Coordinate conversion, unit conversion, and the deterministic hash live in `nodebridge.common`. Backends call those functions. They do not each invent an axis swap.
 
-Translators call these. They do not embed their own axis swaps.
+Canonical space is right-handed, X right, Y forward, Z up, meters. Houdini is Y-up: `(x, y, z)` becomes `(x, z, -y)`. Unreal locations are left-handed X-forward Z-up centimeters: `(y, x, z) * 100`. A random Euler range uses `convert_euler_axes`, which keeps a full turn as a full turn. A single orientation still uses `convert_euler`.
 
-## What stays out of the core
+`nb_rand(seed, element_id)` is a signed 32-bit hash. It is emitted into VEX and copied into Unreal Python when NodeBridge owns the random sequence. Native Scatter and PCG Surface Sampler stay equivalent, because those DCCs own the sample positions.
 
-`import nodebridge` does not import `bpy`, `hou`, or `unreal`. The Blender panel lives in `nodebridge.addon` and is loaded only when Blender calls `register()`. Host SDKs are named inside generated scripts, which are text, and inside optional runtime modules via importlib.
+## Adding a target
 
-Generated Python is not the IR. Opening a `.nodebridge.json` file does not run it.
-
-## Extending
-
-A new DCC implements `SourceFrontend` or a host backend and registers recipes. A new semantic operation is an `OperationSpec` plus zero or more recipes. Missing recipes classify as unsupported.
-
-`TranslationFallbackProvider` can later explain a gap. The shipping compiler uses no provider.
+Implement a backend with `supports`, `classify`, and `generate`. Register translators for the semantic operations it can build. Leave the parser and the IR alone. Maya, Bifrost, Substance Designer, Godot, Cinema 4D, and Nuke would be new backends, not a new compiler.

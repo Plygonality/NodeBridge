@@ -1,12 +1,15 @@
-"""Public translation confidence and optional fallback hooks."""
+"""Confidence labels, translator registration, and the fallback interface."""
 
-from nodebridge.translation.confidence import Confidence, confidence_for, summarize_confidence
-from nodebridge.translation.fallback import NullFallback, TranslationFallbackProvider
+from nodebridge.translation.confidence import Classification, Confidence, Strictness, TranslationRecord
+from nodebridge.translation.fallback import TranslationFallbackProvider
+from nodebridge.translation.registry import REGISTRY, translator
 
 __all__ = [
+    "REGISTRY",
+    "Classification",
     "Confidence",
-    "NullFallback",
+    "Strictness",
     "TranslationFallbackProvider",
-    "confidence_for",
-    "summarize_confidence",
+    "TranslationRecord",
+    "translator",
 ]

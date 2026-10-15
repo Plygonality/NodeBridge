@@ -1,22 +1,23 @@
-"""User-facing translation confidence.
+"""Translation confidence.
 
-Internal recipes still use the finer :class:`TranslationStatus` values
-(``LOWERED``, ``CUSTOM_CODE``, ``BAKED``). Reports and the Blender panel
-collapse those into four classes:
+Every emitted operation is one of:
 
-* ``EXACT`` — target behavior should match the source to a very high degree.
-* ``EQUIVALENT`` — the procedural intention is preserved. Implementation
-  details, topology, or random samples may differ.
-* ``APPROXIMATE`` — a similar result is possible, but not the full behavior.
+* ``EXACT`` — the target should reproduce the source behavior very closely.
+* ``EQUIVALENT`` — the procedural intention is preserved. Samples, topology,
+  or implementation details may differ.
+* ``APPROXIMATE`` — the target can produce a similar result, not the full
+  source behavior.
 * ``UNSUPPORTED`` — no reliable target implementation exists.
+
+NodeBridge does not claim pixel-identical or vertex-identical output unless
+a translation is classified ``EXACT`` and the report does not list a
+numerical limitation.
 """
 
 from __future__ import annotations
 
-from collections import Counter
+from dataclasses import dataclass, field
 from enum import Enum
-
-from nodebridge.core.diagnostics import TranslationReport, TranslationStatus
 
 
 class Confidence(str, Enum):
@@ -26,25 +27,64 @@ class Confidence(str, Enum):
     UNSUPPORTED = "unsupported"
 
 
-_EQUIVALENT_VALUES = frozenset({"lowered", "custom_code"})
-_APPROXIMATE_VALUES = frozenset({"approximate", "baked"})
+_RANK = {
+    Confidence.EXACT: 0,
+    Confidence.EQUIVALENT: 1,
+    Confidence.APPROXIMATE: 2,
+    Confidence.UNSUPPORTED: 3,
+}
 
 
-def confidence_for(status: TranslationStatus | str) -> Confidence:
-    """Map an internal status onto the four public classes."""
-    value = status.value if isinstance(status, TranslationStatus) else str(status)
-    if value == "exact":
-        return Confidence.EXACT
-    if value in _EQUIVALENT_VALUES:
-        return Confidence.EQUIVALENT
-    if value in _APPROXIMATE_VALUES:
-        return Confidence.APPROXIMATE
-    return Confidence.UNSUPPORTED
+class Strictness(str, Enum):
+    """How far from exact a generated implementation is allowed to be."""
+
+    EXACT_ONLY = "exact_only"
+    ALLOW_EQUIVALENT = "allow_equivalent"
+    ALLOW_APPROXIMATE = "allow_approximate"
+
+    def allows(self, confidence: Confidence) -> bool:
+        if confidence is Confidence.UNSUPPORTED:
+            return False
+        if self is Strictness.EXACT_ONLY:
+            return confidence is Confidence.EXACT
+        if self is Strictness.ALLOW_EQUIVALENT:
+            return _RANK[confidence] <= _RANK[Confidence.EQUIVALENT]
+        return _RANK[confidence] <= _RANK[Confidence.APPROXIMATE]
 
 
-def summarize_confidence(report: TranslationReport) -> dict[Confidence, int]:
-    """Count outcomes in the four public classes."""
-    counter: Counter[Confidence] = Counter()
-    for outcome in report.outcomes:
-        counter[confidence_for(outcome.status)] += 1
-    return {item: counter.get(item, 0) for item in Confidence}
+@dataclass
+class Classification:
+    """Why an operation received its confidence, and what was generated."""
+
+    confidence: Confidence
+    explanation: str
+    implementation: str
+    limitations: tuple[str, ...] = ()
+    fallback: str | None = None
+    emitted: bool = True
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "confidence": self.confidence.value,
+            "explanation": self.explanation,
+            "implementation": self.implementation,
+            "limitations": list(self.limitations),
+            "fallback": self.fallback,
+            "emitted": self.emitted,
+        }
+
+
+@dataclass
+class TranslationRecord:
+    """One operation after capability resolution."""
+
+    operation_id: str
+    operation_name: str
+    operation: str
+    classification: Classification
+    source_types: tuple[str, ...] = ()
+    notes: list[str] = field(default_factory=list)
+
+    @property
+    def confidence(self) -> Confidence:
+        return self.classification.confidence

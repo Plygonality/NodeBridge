@@ -1,0 +1,325 @@
+{
+  "__type__": "NodeTree",
+  "edges": [
+    {
+      "__type__": "GraphEdge",
+      "from_node": "render_layers",
+      "from_socket": "Image",
+      "id": "e0",
+      "to_node": "glare",
+      "to_socket": "Image"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "glare",
+      "from_socket": "Image",
+      "id": "e1",
+      "to_node": "color_correction",
+      "to_socket": "Image"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "color_correction",
+      "from_socket": "Image",
+      "id": "e2",
+      "to_node": "vignette_mix",
+      "to_socket": "Image"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "vignette",
+      "from_socket": "Mask",
+      "id": "e3",
+      "to_node": "vignette_mix",
+      "to_socket": "Fac"
+    },
+    {
+      "__type__": "GraphEdge",
+      "from_node": "vignette_mix",
+      "from_socket": "Image",
+      "id": "e4",
+      "to_node": "composite",
+      "to_socket": "Image"
+    }
+  ],
+  "id": "gradeandglare",
+  "interface": [],
+  "ir_version": "1.0",
+  "metadata": {
+    "source": "blender"
+  },
+  "name": "GradeAndGlare",
+  "nodes": [
+    {
+      "__type__": "GraphNode",
+      "id": "render_layers",
+      "inputs": [],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Render Layers",
+      "nested": null,
+      "node_type": "CompositorNodeRLayers",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Image",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Image"
+        }
+      ],
+      "parameters": [],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "glare",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Image",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Image"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Glare",
+      "nested": null,
+      "node_type": "CompositorNodeGlare",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Image",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Image"
+        }
+      ],
+      "parameters": [],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "color_correction",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Image",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Image"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Color Correction",
+      "nested": null,
+      "node_type": "CompositorNodeBrightContrast",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Image",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Image"
+        }
+      ],
+      "parameters": [],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "vignette",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 1.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Mask",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mask"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Vignette",
+      "nested": null,
+      "node_type": "CompositorNodeEllipseMask",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Mask",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Mask"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Mask",
+          "name": "Mask",
+          "value": 1.0
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "vignette_mix",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "float",
+          "default": 1.0,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Fac",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Fac"
+        },
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Image",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Image"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Vignette Mix",
+      "nested": null,
+      "node_type": "CompositorNodeMixRGB",
+      "outputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "output",
+          "enabled": true,
+          "identifier": "Image",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Image"
+        }
+      ],
+      "parameters": [
+        {
+          "__type__": "NodeParameter",
+          "data_type": "float",
+          "exposed": false,
+          "identifier": "Fac",
+          "name": "Fac",
+          "value": 1.0
+        }
+      ],
+      "properties": {
+        "blend_type": "MULTIPLY"
+      }
+    },
+    {
+      "__type__": "GraphNode",
+      "id": "composite",
+      "inputs": [
+        {
+          "__type__": "GraphSocket",
+          "data_type": "color",
+          "default": null,
+          "direction": "input",
+          "enabled": true,
+          "identifier": "Image",
+          "is_field": false,
+          "is_multi_input": false,
+          "metadata": {},
+          "name": "Image"
+        }
+      ],
+      "label": "",
+      "location": [
+        0.0,
+        0.0
+      ],
+      "metadata": {},
+      "mute": false,
+      "name": "Composite",
+      "nested": null,
+      "node_type": "CompositorNodeComposite",
+      "outputs": [],
+      "parameters": [],
+      "properties": {}
+    }
+  ],
+  "system": "compositor"
+}

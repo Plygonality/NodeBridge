@@ -1,6 +1,6 @@
-"""Source frontends. Blender is the first implementation."""
+"""Source frontends. Blender is the implemented frontend."""
 
 from nodebridge.frontend.base import SourceFrontend
-from nodebridge.frontend.blender.parser import parse_node_tree
+from nodebridge.frontend.blender import BlenderFrontend
 
-__all__ = ["SourceFrontend", "parse_node_tree"]
+__all__ = ["BlenderFrontend", "SourceFrontend"]

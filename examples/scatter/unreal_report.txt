@@ -1,0 +1,40 @@
+NodeBridge translation report
+
+Source:
+Geometry Nodes / ScatterBuildings
+
+Target:
+Unreal Engine 5
+
+8 source nodes
+8 semantic operations
+
+EXACT: 1
+EQUIVALENT: 4
+APPROXIMATE: 3
+UNSUPPORTED: 0
+
+Approximation:
+Instance Cube (primitive)
+PCG has no primitive-cube node in the Python API used here. The graph input is the surface, and the spawner mesh is assigned by hand.
+
+Random Scale (random)
+Scale and rotation ranges are written to PCGTransformPointsSettings when that class exists. Unreal's random series is not NodeBridge's hash and is not Blender's.
+Property names are guarded. A missing property is logged and skipped.
+
+Random Rotation (random)
+Scale and rotation ranges are written to PCGTransformPointsSettings when that class exists. Unreal's random series is not NodeBridge's hash and is not Blender's.
+Property names are guarded. A missing property is logged and skipped.
+
+Limitations:
+Building Scatter (scatter)
+Surface Sampler is the PCG equivalent of distributing points on a surface. Unreal's sample positions are not Blender's, even with the same seed.
+Target random samples may differ.
+
+Instance on Points (instance)
+Static Mesh Spawner instances a mesh on the points. Assign the mesh on the spawner; the Python API used here does not construct a mesh from a Blender primitive.
+The instance mesh is not generated from Blender geometry.
+
+Rewrite rules considered: spatial_noise_mask, random_transform
+
+Exact means the target should follow the source closely. Equivalent preserves the procedural intention and may differ in samples or topology. Approximate is a similar result, not the full source behavior. NodeBridge does not claim vertex-identical or pixel-identical output unless a translation is exact and this report lists no numerical limitation.

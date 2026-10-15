@@ -1,34 +1,49 @@
-NodeBridge Translation Report
-=============================
-Source: compositor / Grade
-Target: unreal (pcg)
+NodeBridge translation report
 
-5 source nodes
-5 semantic operations
+Source:
+Compositor / GradeAndGlare
+
+Target:
+Unreal Engine 5
+
+6 source nodes
+6 semantic operations
 
 EXACT: 0
 EQUIVALENT: 0
-APPROXIMATE: 0
-UNSUPPORTED: 5
-
-The expected result is a semantically equivalent procedural system.
-It is not a promise of identical vertices, samples, or pixels.
+APPROXIMATE: 2
+UNSUPPORTED: 4
 
 Unsupported:
-    CompositorNodeEllipseMask
-    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
-    CompositorNodeRLayers
-    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
-    CompositorNodeGlare
-    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
-    CompositorNodeColorBalance
-    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
-    CompositorNodeComposite
-    Reason: Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.
+CompositorNodeRLayers (Render Layers)
+Reason:
+No Unreal compositor equivalent is implemented for render_layer.
+Fallback: listed in the script and omitted from the material
 
-Diagnostics:
-    [error] Operation 'compositor.mask' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
-    [error] Operation 'compositor.input' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
-    [error] Operation 'compositor.glare' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
-    [error] Operation 'compositor.color_correct' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
-    [error] Operation 'compositor.output' has no defensible translation (Unreal Editor Python has no Blender-style compositor graph. NodeBridge does not invent a post-process material for this operation.)
+CompositorNodeGlare (Glare)
+Reason:
+No Unreal compositor equivalent is implemented for glare.
+Fallback: listed in the script and omitted from the material
+
+CompositorNodeEllipseMask (Vignette)
+Reason:
+No Unreal compositor equivalent is implemented for ellipse_mask.
+Fallback: listed in the script and omitted from the material
+
+CompositorNodeComposite (Composite)
+Reason:
+No Unreal compositor equivalent is implemented for composite_output.
+Fallback: listed in the script and omitted from the material
+
+Approximation:
+Color Correction (compositor_operation)
+brightness is only a color-material approximation of the compositor node.
+This is not a compositor graph. Glare and masks are not reproduced.
+
+Vignette Mix (compositor_operation)
+mix is only a color-material approximation of the compositor node.
+This is not a compositor graph. Glare and masks are not reproduced.
+
+Rewrite rules considered: spatial_noise_mask, random_transform
+
+Exact means the target should follow the source closely. Equivalent preserves the procedural intention and may differ in samples or topology. Approximate is a similar result, not the full source behavior. NodeBridge does not claim vertex-identical or pixel-identical output unless a translation is exact and this report lists no numerical limitation.
