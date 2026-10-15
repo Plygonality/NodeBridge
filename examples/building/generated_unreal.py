@@ -16,7 +16,7 @@ import unreal
 ASSET_PATH = "/Game/NodeBridge"
 SPAWN_PCG_VOLUME = False  # True: also place a PCG Volume using the new graph
 
-# Controls (Blender group inputs, Blender units). Edit and re-run to rebuild the graph.
+# Controls (Blender group inputs, Blender units). These are script constants, not live PCG parameters. Edit and re-run to rebuild the graph.
 WIDTH = 10.0  # Width
 DEPTH = 8.0  # Depth
 FLOORS = 6  # Floors
@@ -141,7 +141,7 @@ def build():
     NB_WARNINGS.append('Not translated: Slab Thickness (EXTRUDE). PCG works on point data; this modelling operation has no PCG node (a Geometry Script backend could cover it later).')
 
     # Stack Floors: INSTANCE [UNSUPPORTED] -> none  (Blender: GeometryNodeInstanceOnPoints)
-    NB_WARNINGS.append('Not translated: Stack Floors (INSTANCE). The instanced geometry is procedural; PCG spawns Static Mesh assets.')
+    NB_WARNINGS.append('Not translated: Stack Floors (INSTANCE). The instanced geometry is procedural; PCG spawns Static Mesh assets. Convert the instance geometry to a Static Mesh asset and assign it on the spawner.')
 
     # Window Positions: SCATTER [APPROXIMATE] -> PCGSurfaceSamplerSettings  (Blender: GeometryNodeDistributePointsOnFaces)
     window_positions, window_positions_settings = nb_pcg_node(graph, "PCGSurfaceSamplerSettings", 2000, 0)

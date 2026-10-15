@@ -45,9 +45,7 @@ NodeBridge does **not** promise vertex-identical or pixel-identical results betw
 
 Requirements: **Blender 4.2 LTS or newer** (tested on 4.2 LTS and 4.5 LTS). No other dependencies.
 
-1. Get the add-on zip:
-   * download `nodebridge-0.3.0.zip` from the repository's releases, **or**
-   * build it from a checkout with `python tools/build_addon.py`, which writes `dist/nodebridge-0.3.0.zip` (Blender is not needed for the build).
+1. Get the add-on zip. The file in this repository is [`release/nodebridge-0.3.0.zip`](release/nodebridge-0.3.0.zip). The **CI** workflow builds the same zip and uploads it as the `nodebridge-addon` artifact. You can also build it from a checkout with `python tools/build_addon.py`, which writes `dist/nodebridge-0.3.0.zip` (Blender is not needed for the build).
 2. In Blender, open **Edit > Preferences > Get Extensions**.
 3. Click the **⌄** menu in the top-right corner and choose **Install from Disk…**
 4. Select `nodebridge-0.3.0.zip`. NodeBridge is installed and enabled.
@@ -56,9 +54,9 @@ You can also drag the zip into the Blender window. Blender itself validates the 
 
 ## Use it: Blender to Houdini
 
-1. Select an object that has a **Geometry Nodes** modifier, and open the **Geometry Node Editor**.
-   *To try it without your own scene, open Blender's **Scripting** workspace, open `examples/blender/build_examples.py` in the Text Editor, and click **Run Script**. This builds the four example systems.*
-2. Press **N** to open the sidebar, then click the **NodeBridge** tab.
+1. Select an object that has a **Geometry Nodes** modifier. You can work from the **3D Viewport** or the **Geometry Node Editor**.
+   *To try it without your own scene, open [`examples/nodebridge_examples.blend`](examples/nodebridge_examples.blend). It contains the four example systems. `examples/blender/build_examples.py` is how that file is rebuilt.*
+2. Press **N** to open the sidebar, then click the **NodeBridge** tab. The same panel is in the 3D Viewport and the node editor.
 3. **Source** shows what was detected: `Geometry Nodes`, the tree name, and the object and modifier it belongs to. Leave it on **Auto**, or force Geometry Nodes / Shader / Compositor.
 4. **Target**: choose **Houdini**.
 5. Click **Analyze Graph**. The panel shows the number of nodes analyzed and operations detected, the Exact / Equivalent / Approximate / Unsupported counts, and a warnings list. **Open Report** and **Copy Report** give you the full translation report.
@@ -118,7 +116,7 @@ Complete generated scripts and expected reports for all four examples are in [`e
 | [Scatter](examples/scatter/) | ground plane, Distribute Points on Faces, noise coverage mask, random scale and rotation, instanced rocks with a material | 10 exact, 9 equivalent, 2 approximate, 0 unsupported | 4 / 9 / 8 / 0 |
 | [Building](examples/building/) | grid footprint, extruded mass, floor slabs stacked from a nested node group, randomized windows on walls | 21 / 3 / 0 / 0 | 4 / 3 / 5 / 11 (PCG has no mesh modelling) |
 | [Shader](examples/shader/) | noise, color ramp, roughness modulation, bump, a labeled Value node as a parameter | 4 / 3 / 1 / 0 | 4 / 2 / 2 / 0 |
-| [Compositor](examples/compositor/) | render layer, glare, color balance, vignette (ellipse mask + blur + multiply), composite | 0 / 1 / 2 / 2 | 0 / 2 / 3 / 0 |
+| [Compositor](examples/compositor/) | render layer, glare, color balance, vignette (ellipse mask + blur + multiply), composite | 0 / 1 / 4 / 0 | 0 / 2 / 3 / 0 |
 
 ---
 
@@ -158,7 +156,7 @@ The real current lists are generated from code: [docs/support_matrix.md](docs/su
 
 * **Geometry Nodes:** Group Input/Output, nested node groups, Join Geometry, Transform Geometry, Set Position, Position, Normal, Index, ID, Value / Integer / Boolean / Vector / Color / String inputs, Math, Vector Math, Clamp, Float to Integer, Map Range, Compare, Boolean Math, Switch, Mix, Color Ramp, Combine/Separate XYZ, Noise Texture, Voronoi Texture, Random Value, Distribute Points on Faces, Instance on Points, Realize Instances, Rotate/Scale/Translate Instances, Set Material, Mesh Cube/Grid/UV Sphere/Ico Sphere/Cylinder/Cone/Line/Circle, Curve Line/Circle/Spiral, Curve to Mesh, Resample Curve, Mesh to Curve, Mesh to Points, Extrude Mesh, Subdivide Mesh, Subdivision Surface, Delete Geometry, Separate Geometry, Mesh Boolean, Geometry Proximity, Raycast, Object Info, Collection Info, Named Attribute, Store Named Attribute, Align Euler/Rotation to Vector. Simulation, Repeat and For Each zones are reported as unsupported.
 * **Shader:** Material Output, Principled BSDF, Diffuse BSDF, Emission, Mix/Add Shader, Image Texture, Texture Coordinate, UV Map, Geometry, Mapping, Bump, Normal Map, Noise, Voronoi, Gradient/Checker/Wave, Color Ramp, Math, Vector Math, Mix, Map Range, Clamp, Invert, Hue/Saturation, Gamma, Bright/Contrast, RGB to BW, Separate/Combine Color, Value and RGB (labeled ones become parameters).
-* **Compositor:** Render Layers, Image, Composite, Viewer, Glare, Color Balance, Ellipse Mask, Blur, Mix, Bright/Contrast, Hue/Saturation, Gamma, Exposure, Lens Distortion, Invert, RGB, Value, Math.
+* **Compositor:** Render Layers, Image, Composite, Viewer, Glare (Houdini: approximate glow), Color Balance, Ellipse Mask, Blur, Mix, Bright/Contrast, Hue/Saturation, Gamma, Exposure, Lens Distortion, Invert, RGB, Value, Math. The ellipse-mask vignette is recognized and, on Houdini, built as a circle, a blur, and a multiply.
 
 Any other node becomes an `UNSUPPORTED_OPERATION`: it is reported, and a placeholder keeps the target network connected.
 
@@ -168,7 +166,7 @@ Any other node becomes an `UNSUPPORTED_OPERATION`: it is reported, and a placeho
 
 * **Blender side (verified):** the parser, the add-on UI, the operators and the extension package were run in real **Blender 4.2.23 LTS and 4.5.14 LTS**, both in background and in the GUI. The clipboard copy was checked against the system clipboard. Node socket identifiers and properties were probed in both versions.
 * **Generated code (structurally verified):** every generated Houdini and Unreal script is parsed, then executed against recording stand-ins for `hou` and `unreal` (in `tests/fakes/`). Those stand-ins check call shapes, wiring and pin labels.
-* **Not yet verified in a live Houdini or Unreal session.** No Houdini or Unreal licence was available while building 0.3. API usage follows the documented `hou` and Unreal Python APIs, and version-sensitive calls are guarded. Some SOP / COP2 parameter names and Unreal PCG property names may differ in your version: the script reports them as warnings instead of failing. Running the four examples in real Houdini 20.x and Unreal 5.4+ is the top item on the [roadmap](docs/roadmap.md).
+* **Not yet verified in a live Houdini or Unreal session.** No Houdini or Unreal licence was available while building 0.3. API usage follows the documented `hou` and Unreal Python APIs, and version-sensitive calls are guarded. Some SOP / COP2 parameter names and Unreal PCG property names may differ in your version: the script reports them as warnings instead of failing. That gap is recorded in [examples/live_sessions.md](examples/live_sessions.md). Running the four examples in real Houdini 20.x and Unreal 5.4+ is the top item on the [roadmap](docs/roadmap.md).
 * **Randomness:** the NodeBridge hash is identical in Python and VEX. The test suite compiles the generated VEX library as C and compares it with Python. Blender's own random sequence is not reproduced, so random-dependent operations are classified EQUIVALENT.
 
 ## Known limitations
@@ -178,7 +176,8 @@ Any other node becomes an `UNSUPPORTED_OPERATION`: it is reported, and a placeho
 * Node groups become Houdini subnets with promoted parameters, unless fields cross the group boundary (then they are inlined). On Unreal, groups are inlined.
 * Noise and Voronoi patterns differ numerically from Blender's (APPROXIMATE).
 * Simulation, Repeat and For Each zones, matrix sockets, menu switches, edge-domain attributes, volume shading and displacement are not translated.
-* Houdini compositing targets COP2, not Houdini 20.5's Copernicus. Unreal compositing is limited to Post Process Volume settings.
+* Houdini compositing targets COP2, not Houdini 20.5's Copernicus. Glare is an approximate glow (lumakey, bright, blur, over). The vignette is a blurred circle multiplied over the image. Lens distortion and a general color-correction node still have no COP2 translator. Unreal compositing is limited to Post Process Volume settings.
+* On Unreal, mesh modelling (extrude, curves, subdivision) stays unsupported. The extruded building is a Houdini result. The report says so in one sentence. PCG parameters are still script-level constants until a live Unreal session confirms that API.
 
 ---
 
@@ -188,7 +187,7 @@ The compiler is pure Python (3.11+) with no dependencies, and it never imports `
 
 ```bash
 python -m pip install -e ".[dev]"
-python -m pytest                                    # 85 tests; Blender tests are skipped
+python -m pytest                                    # 86 tests; the Blender integration test is skipped
 NODEBRIDGE_BLENDER=/path/to/blender python -m pytest tests/test_blender_integration.py
 
 nodebridge analyze  examples/scatter/scatter.graph.json --target houdini

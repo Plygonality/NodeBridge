@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: python -m ruff check src tests
+      - name: Test
+        run: python -m pytest
+      - name: Golden files are current
+        run: |
+          python tools/regenerate_examples.py
+          git diff --exit-code -- examples docs/support_matrix.md
+
+  addon:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: "4.2.23"
+            series: "Blender4.2"
+          - version: "4.5.14"
+            series: "Blender4.5"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download Blender ${{ matrix.version }}
+        run: |
+          curl -fL --retry 3 -o blender.tar.xz \
+            "https://mirrors.ocf.berkeley.edu/blender/release/${{ matrix.series }}/blender-${{ matrix.version }}-linux-x64.tar.xz"
+          mkdir -p "$RUNNER_TEMP/blender"
+          tar -xJf blender.tar.xz -C "$RUNNER_TEMP/blender"
+          echo "BLENDER=$RUNNER_TEMP/blender/blender-${{ matrix.version }}-linux-x64/blender" >> "$GITHUB_ENV"
+      - name: Install test tools
+        run: python -m pip install -e ".[dev]"
+      - name: Build and validate the extension
+        run: |
+          python tools/build_addon.py
+          "$BLENDER" --command extension validate dist/nodebridge-*.zip
+      - name: Run the add-on inside Blender
+        env:
+          NODEBRIDGE_BLENDER: ${{ env.BLENDER }}
+        run: python -m pytest tests/test_blender_integration.py
+      - name: Upload the add-on zip
+        if: matrix.version == '4.2.23'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nodebridge-addon
+          path: dist/nodebridge-*.zip

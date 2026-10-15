@@ -71,6 +71,13 @@ def resolve_source(context: Any, source_type: str = "AUTO") -> SourceSelection:
     wanted = KIND_BY_SOURCE_TYPE.get(source_type)
     if wanted is None and space is not None and getattr(space, "type", "") == "NODE_EDITOR":
         wanted = TREE_KINDS.get(getattr(space, "tree_type", ""))
+    if wanted is None and space is not None and getattr(space, "type", "") == "VIEW_3D":
+        if _geometry_modifier(obj) is not None:
+            wanted = TreeKind.GEOMETRY
+        elif obj is not None and getattr(getattr(obj, "active_material", None), "use_nodes", False):
+            wanted = TreeKind.SHADER
+        else:
+            wanted = TreeKind.COMPOSITOR
     wanted = wanted or TreeKind.GEOMETRY
 
     if wanted == TreeKind.GEOMETRY:

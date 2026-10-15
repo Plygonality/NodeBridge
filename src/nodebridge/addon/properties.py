@@ -58,6 +58,7 @@ class NODEBRIDGE_PG_settings(PropertyGroup):
     approximate: IntProperty()
     unsupported: IntProperty()
     blocked: IntProperty()
+    warning_total: IntProperty()
     messages: CollectionProperty(type=NODEBRIDGE_PG_message)
     report_text: StringProperty()
     code_text: StringProperty()

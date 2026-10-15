@@ -150,6 +150,18 @@ def test_shader_and_compositor_targets():
     types = [n.type_name for n in shader.node("/mat").children()]
     assert types.count("mtlxmix") == 2, "three-stop ramp = two mixes"
     assert "mtlxheighttonormal" in types and "mtlxfractal3d" in types
-    comp = run_script(compile_example("compositor", "houdini").code.code, "hou")
+    result = compile_example("compositor", "houdini")
+    assert result.report.counts["UNSUPPORTED"] == 0
+    comp = run_script(result.code.code, "hou")
     net = comp.node("/img").children()[0]
-    assert net.type_name == "img" and any(n.type_name == "colorcorrect" for n in net.children())
+    types = {n.type_name for n in net.children()}
+    assert net.type_name == "img"
+    assert {"colorcorrect", "lumakey", "blur", "over", "shape", "multiply"} <= types
+    # These tokens are what the generator writes. A live Houdini may still warn; the fake records them so a later edit cannot drop them.
+    parms = {}
+    for node in net.children():
+        parms.setdefault(node.type_name, {}).update(node.parm_values)
+    assert parms["lumakey"]["minlum"] == 0.8 and parms["lumakey"]["domin"] == 1
+    assert parms["shape"]["shapetype"] == "circle"
+    assert parms["shape"]["sx"] == 0.9 and parms["shape"]["sy"] == 0.75
+    assert "size" in parms["blur"] and "bright" in parms["bright"]
