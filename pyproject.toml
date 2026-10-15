@@ -36,7 +36,7 @@ Homepage = "https://github.com/Plygonality/NodeBridge"
 where = ["src"]
 
 [tool.setuptools.package-data]
-nodebridge = ["blender_manifest.toml"]
+nodebridge = ["blender_manifest.toml", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
