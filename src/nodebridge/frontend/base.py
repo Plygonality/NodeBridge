@@ -1,25 +1,45 @@
-"""Source frontend contract.
+"""Source frontend abstraction.
 
-A frontend reads a native graph and lowers it to semantic IR. Blender is the
-first frontend. A later Houdini or Unreal frontend would implement the same
-methods and register a new id. The compiler does not import a DCC to do that.
+A frontend turns a source application's node system into Graph IR
+(``parse``) and lifts Graph IR into Semantic IR (``lift``). Blender is
+the only implemented frontend; Houdini or Unreal frontends would subclass
+:class:`SourceFrontend` and register their own lifters, which makes
+NodeBridge bidirectional without changing the compiler or backends.
 """
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from abc import ABC, abstractmethod
+from typing import Any
 
-from nodebridge.ir.graph import GraphSystem, NodeTree
-from nodebridge.ir.semantic import SemanticGraph
+from ..compiler.diagnostics import DiagnosticBag
+from ..ir.graph import GraphDocument
+from ..ir.semantic import SemanticGraph
 
 
-class SourceFrontend(Protocol):
-    """Parse a native graph and lower the graph IR to semantic operations."""
+class SourceFrontend(ABC):
+    id: str = ""
+    display_name: str = ""
+    coordinate_system: str = "blender"
 
-    id: str
+    @abstractmethod
+    def parse(self, source: Any, **options: Any) -> GraphDocument:
+        """Read a live source object into Graph IR."""
 
-    def parse(self, source: Any, *, system: GraphSystem | None = None) -> NodeTree:
-        """Read ``source`` into graph IR."""
+    @abstractmethod
+    def lift(self, document: GraphDocument, diagnostics: DiagnosticBag) -> SemanticGraph:
+        """Translate Graph IR into Semantic IR."""
 
-    def lower(self, tree: NodeTree) -> SemanticGraph:
-        """Turn graph IR into semantic IR."""
+
+_FRONTENDS: dict[str, SourceFrontend] = {}
+
+
+def register_frontend(frontend: SourceFrontend) -> SourceFrontend:
+    _FRONTENDS[frontend.id] = frontend
+    return frontend
+
+
+def get_frontend(frontend_id: str) -> SourceFrontend:
+    if frontend_id not in _FRONTENDS:
+        from . import blender  # noqa: F401  (registers the Blender frontend)
+    return _FRONTENDS[frontend_id]

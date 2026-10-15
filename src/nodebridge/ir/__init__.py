@@ -1,25 +1,6 @@
-"""Graph IR and semantic IR."""
+"""Intermediate representations.
 
-from nodebridge.ir.graph import GraphEdge, GraphNode, GraphSocket, GraphSystem, NodeTree
-from nodebridge.ir.semantic import Operation, OperationKind, SemanticGraph
-from nodebridge.ir.serialization import IR_VERSION, dump, dumps, load, loads
-from nodebridge.ir.types import DataType, TypeRef, compatibility
-
-__all__ = [
-    "IR_VERSION",
-    "DataType",
-    "GraphEdge",
-    "GraphNode",
-    "GraphSocket",
-    "GraphSystem",
-    "NodeTree",
-    "Operation",
-    "OperationKind",
-    "SemanticGraph",
-    "TypeRef",
-    "compatibility",
-    "dump",
-    "dumps",
-    "load",
-    "loads",
-]
+* :mod:`.graph` — Graph IR: faithful node/socket/link structure of a source tree.
+* :mod:`.semantic` — Semantic IR: what the tree *does*, as typed operations.
+* :mod:`.operations` — registry of semantic operation specifications.
+"""

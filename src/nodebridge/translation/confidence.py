@@ -1,17 +1,15 @@
-"""Translation confidence.
+"""Translation confidence classification.
 
-Every emitted operation is one of:
-
-* ``EXACT`` — the target should reproduce the source behavior very closely.
-* ``EQUIVALENT`` — the procedural intention is preserved. Samples, topology,
-  or implementation details may differ.
-* ``APPROXIMATE`` — the target can produce a similar result, not the full
-  source behavior.
-* ``UNSUPPORTED`` — no reliable target implementation exists.
-
-NodeBridge does not claim pixel-identical or vertex-identical output unless
-a translation is classified ``EXACT`` and the report does not list a
-numerical limitation.
+EXACT
+    The target should reproduce the source behaviour to a very high degree.
+EQUIVALENT
+    The procedural intent is preserved, but implementation details or
+    generated samples (e.g. random point positions) may differ.
+APPROXIMATE
+    The target produces a similar result but not the full source behaviour.
+UNSUPPORTED
+    No reliable target implementation exists. A placeholder is generated
+    and the gap is reported; it is never silently dropped.
 """
 
 from __future__ import annotations
@@ -21,70 +19,76 @@ from enum import Enum
 
 
 class Confidence(str, Enum):
-    EXACT = "exact"
-    EQUIVALENT = "equivalent"
-    APPROXIMATE = "approximate"
-    UNSUPPORTED = "unsupported"
+    EXACT = "EXACT"
+    EQUIVALENT = "EQUIVALENT"
+    APPROXIMATE = "APPROXIMATE"
+    UNSUPPORTED = "UNSUPPORTED"
+
+    @property
+    def rank(self) -> int:
+        return _RANK[self]
+
+    @property
+    def symbol(self) -> str:
+        return _SYMBOL[self]
+
+    @property
+    def label(self) -> str:
+        return self.value.title()
+
+    def worst(self, other: "Confidence") -> "Confidence":
+        return self if self.rank >= other.rank else other
+
+    def allowed_by(self, strictness: "Strictness") -> bool:
+        return self.rank <= strictness.max_rank
 
 
-_RANK = {
-    Confidence.EXACT: 0,
-    Confidence.EQUIVALENT: 1,
-    Confidence.APPROXIMATE: 2,
-    Confidence.UNSUPPORTED: 3,
-}
+_RANK = {Confidence.EXACT: 0, Confidence.EQUIVALENT: 1, Confidence.APPROXIMATE: 2, Confidence.UNSUPPORTED: 3}
+_SYMBOL = {Confidence.EXACT: "✓", Confidence.EQUIVALENT: "≈", Confidence.APPROXIMATE: "~", Confidence.UNSUPPORTED: "✕"}
 
 
 class Strictness(str, Enum):
-    """How far from exact a generated implementation is allowed to be."""
+    EXACT_ONLY = "EXACT_ONLY"
+    ALLOW_EQUIVALENT = "ALLOW_EQUIVALENT"
+    ALLOW_APPROXIMATE = "ALLOW_APPROXIMATE"
 
-    EXACT_ONLY = "exact_only"
-    ALLOW_EQUIVALENT = "allow_equivalent"
-    ALLOW_APPROXIMATE = "allow_approximate"
-
-    def allows(self, confidence: Confidence) -> bool:
-        if confidence is Confidence.UNSUPPORTED:
-            return False
-        if self is Strictness.EXACT_ONLY:
-            return confidence is Confidence.EXACT
-        if self is Strictness.ALLOW_EQUIVALENT:
-            return _RANK[confidence] <= _RANK[Confidence.EQUIVALENT]
-        return _RANK[confidence] <= _RANK[Confidence.APPROXIMATE]
+    @property
+    def max_rank(self) -> int:
+        return {"EXACT_ONLY": 0, "ALLOW_EQUIVALENT": 1, "ALLOW_APPROXIMATE": 2}[self.value]
 
 
 @dataclass
 class Classification:
-    """Why an operation received its confidence, and what was generated."""
+    """How one semantic operation will be realized on a target."""
 
     confidence: Confidence
-    explanation: str
-    implementation: str
-    limitations: tuple[str, ...] = ()
-    fallback: str | None = None
-    emitted: bool = True
+    explanation: str = ""
+    implementation: str = ""
+    limitations: list[str] = field(default_factory=list)
+    fallback: str = ""
 
-    def to_dict(self) -> dict[str, object]:
+    def downgrade(self, confidence: Confidence, reason: str) -> "Classification":
+        """Return a copy at ``confidence`` or worse, recording why."""
+        worse = self.confidence.worst(confidence)
+        limitations = list(self.limitations)
+        if reason and reason not in limitations:
+            limitations.append(reason)
+        return Classification(worse, self.explanation, self.implementation, limitations, self.fallback)
+
+    def as_dict(self) -> dict:
         return {
             "confidence": self.confidence.value,
             "explanation": self.explanation,
             "implementation": self.implementation,
-            "limitations": list(self.limitations),
+            "limitations": self.limitations,
             "fallback": self.fallback,
-            "emitted": self.emitted,
         }
 
 
-@dataclass
-class TranslationRecord:
-    """One operation after capability resolution."""
-
-    operation_id: str
-    operation_name: str
-    operation: str
-    classification: Classification
-    source_types: tuple[str, ...] = ()
-    notes: list[str] = field(default_factory=list)
-
-    @property
-    def confidence(self) -> Confidence:
-        return self.classification.confidence
+UNSUPPORTED_DEFAULT = Classification(
+    Confidence.UNSUPPORTED,
+    "No NodeBridge translation is implemented for this operation on this target.",
+    "placeholder",
+    [],
+    "A placeholder node with a note is generated so the network stays connected.",
+)

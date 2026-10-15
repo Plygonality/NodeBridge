@@ -1,139 +1,186 @@
-"""Unreal backend.
-
-Geometry graphs become PCG graph assets. Shader graphs become materials.
-Compositor graphs become a material only for color operations; glare, masks,
-and filters are reported unsupported. No Unreal API is called unless it is
-resolved with getattr or is a documented editor class.
-"""
+"""Unreal Engine 5 backend: Semantic IR -> Unreal Editor Python."""
 
 from __future__ import annotations
 
-from nodebridge.backend.unreal.materials import generate_material
-from nodebridge.backend.unreal.pcg import generate_pcg
-from nodebridge.backend.unreal.python import script_header
-from nodebridge.common.names import sanitize_identifier
-from nodebridge.ir.semantic import OperationKind, SemanticGraph
-from nodebridge.translation.confidence import Classification, Confidence, TranslationRecord
+import re
+from typing import TYPE_CHECKING
+
+from ... import __version__
+from ...common.names import NameAllocator, unreal_asset_name
+from ...compiler.diagnostics import DiagnosticBag
+from ...compiler.subgraphs import inline_where
+from ...ir.graph import TreeKind
+from ...ir.semantic import SemanticGraph
+from ...ir.types import DataType
+from ...translation.confidence import Classification, Confidence as C
+from ...translation.registry import translator
+from ..base import GeneratedCode, TargetBackend
+from ..codegen import PyWriter, clean_number, literal
+from ..registry import register_backend
+from .materials import write_material
+from .pcg import PcgBuilder
+from .postprocess import write_postprocess
+from .pyexpr import control_name
+from .runtime import HELPERS, MATERIAL_HELPERS, PCG_HELPERS
+
+if TYPE_CHECKING:
+    from ...compiler.pipeline import CompilationResult
+
+FIELD_KINDS = (
+    "MATH", "VECTOR_MATH", "COMBINE_VECTOR", "SEPARATE_VECTOR", "MAP_RANGE", "COMPARE", "BOOLEAN_MATH", "RANDOM", "NOISE",
+    "VORONOI", "FIELD_INPUT", "ATTRIBUTE_READ", "MIX", "COLOR_RAMP", "PROXIMITY", "RAYCAST", "ALIGN_ROTATION", "SAMPLE", "INTERPOLATE",
+)
+FIELD_REASON = "Per-element field expressions cannot be built with PCG's Python API; only recognized patterns (random ranges, noise masks) are translated."
 
 
-class UnrealBackend:
-    """Generate Unreal Editor Python."""
+def _field_classify(op, graph, base):
+    if not any(ref.field for ref in op.outputs.values()):
+        return Classification(C.EXACT, "Single value evaluated as a script-level expression over the controls.", "Python expression")
+    return None
 
+
+for _kind in FIELD_KINDS:
+    translator(_kind, target="unreal", context="pcg", confidence=C.UNSUPPORTED, implementation="none", explanation=FIELD_REASON, classify=_field_classify)(lambda b, op: None)
+
+
+class UnrealBackend(TargetBackend):
     id = "unreal"
+    display_name = "Unreal Engine 5"
+    language_label = "Unreal Editor Python"
+    coordinate_system = "unreal"
+    required_imports = ("unreal",)
+    contexts = {TreeKind.GEOMETRY: "pcg", TreeKind.SHADER: "material", TreeKind.COMPOSITOR: "postprocess"}
+    context_labels = {"pcg": "PCG graph", "material": "Material asset", "postprocess": "Post Process Volume"}
 
-    def supports(self, operation: OperationKind) -> bool:
-        return self.classify(operation).confidence is not Confidence.UNSUPPORTED
+    def prepare(self, graph: SemanticGraph, diagnostics: DiagnosticBag) -> SemanticGraph:
+        inline_where(graph, lambda g, op: True, diagnostics, "PCG subgraph / material function assets are not generated yet")
+        return graph
 
-    def classify(self, operation: OperationKind) -> Classification:
-        return _DEFAULTS.get(
-            operation,
-            Classification(
-                confidence=Confidence.UNSUPPORTED,
-                explanation=f"No Unreal translator is registered for {operation.value}.",
-                implementation="none",
-            ),
+    def generate(self, result: "CompilationResult") -> GeneratedCode:
+        w = PyWriter()
+        kind = result.semantic.kind
+        self._header(w, result)
+        variables = NameAllocator({"graph", "material", "materials", "settings", "volume", "input_node", "output_node", "build", "unreal", "math"})
+        if kind == TreeKind.GEOMETRY:
+            self._pcg(w, result, variables)
+        elif kind == TreeKind.SHADER:
+            w.block(MATERIAL_HELPERS)
+            w.blank()
+            function = write_material(self, result, w, variables)
+            w.blank()
+            w.line("def build():")
+            w.line(f"    return {function}()")
+            w.blank()
+            w.line("material = build()")
+            w.line('print("NodeBridge: created", material.get_path_name())')
+        else:
+            write_postprocess(self, result, w)
+            w.blank()
+            w.line("volume = build()")
+            w.line('print("NodeBridge: created post process volume", volume.get_actor_label())')
+        w.line("for nb_warning in NB_WARNINGS:")
+        w.line('    unreal.log_warning("NodeBridge: " + nb_warning)')
+        name = unreal_asset_name(result.document.root)
+        code = w.text()
+        if "math." not in code.split('ASSET_PATH = "/Game/NodeBridge"', 1)[1]:
+            code = code.replace("import math\n\n", "", 1)
+        if len(re.findall(r"\binput_node\b", code)) == 1:
+            code = code.replace("    input_node = graph.get_input_node()\n", "", 1)
+        return GeneratedCode(
+            target=self.id,
+            language="python",
+            filename=f"nodebridge_{name}_unreal.py",
+            code=code,
+            run_instructions="Unreal Editor: Save .py, then Tools > Execute Python Script (needs the Python Editor Script Plugin). Pasting into the Output Log's Python console also works where multi-line input is supported.",
         )
 
-    def generate(self, graph: SemanticGraph, options) -> tuple[str, list[TranslationRecord]]:
-        if graph.system.value == "shader":
-            return generate_material(graph, options)
-        if graph.system.value == "compositor":
-            return _generate_compositor(graph, options)
-        return generate_pcg(graph, options)
+    def _header(self, w: PyWriter, result: "CompilationResult") -> None:
+        report = result.report
+        counts = report.counts
+        w.line('"""NodeBridge: generated Unreal Editor Python.')
+        w.line("")
+        w.line(f"Source:  {report.source_kind} / {report.source_name}" + (f" ({report.source_application})" if report.source_application else ""))
+        w.line(f"Target:  {report.target_label}")
+        w.line(f"Translation: {counts['EXACT']} exact, {counts['EQUIVALENT']} equivalent, {counts['APPROXIMATE']} approximate, {counts['UNSUPPORTED']} unsupported")
+        w.line(f"Generated by NodeBridge {__version__}.")
+        w.line("")
+        w.line("Run inside the Unreal Editor with the Python Editor Script Plugin enabled:")
+        w.line("save this file, then Tools > Execute Python Script (or paste into the Output Log's Python console).")
+        if result.semantic.kind == TreeKind.GEOMETRY:
+            w.line("Requires the PCG plugin. The PCG Python API is experimental (UE 5.4+); anything")
+            w.line("this editor version does not expose is listed as a NodeBridge warning in the log.")
+        w.line("New assets are created under ASSET_PATH; existing assets are never overwritten.")
+        w.line('"""')
+        w.line("import math")
+        w.line("")
+        w.line("import unreal")
+        w.blank()
+        w.line('ASSET_PATH = "/Game/NodeBridge"')
+        if result.semantic.kind == TreeKind.GEOMETRY:
+            w.line("SPAWN_PCG_VOLUME = False  # True: also place a PCG Volume using the new graph")
+        self._controls(w, result.semantic)
+        w.block(HELPERS)
+        w.blank()
+
+    def _controls(self, w: PyWriter, graph: SemanticGraph) -> None:
+        if not graph.parameters or graph.kind != TreeKind.GEOMETRY:
+            return
+        w.blank()
+        w.comment("Controls (Blender group inputs, Blender units). Edit and re-run to rebuild the graph.")
+        for p in graph.parameters:
+            value = p.current
+            if isinstance(value, dict):
+                value = value.get("name", "")
+            elif isinstance(value, (list, tuple)):
+                value = tuple(clean_number(float(v)) for v in value)
+            elif isinstance(value, float):
+                value = clean_number(value)
+            elif p.data_type == DataType.BOOL:
+                value = bool(value)
+            w.line(f"{control_name(p.key)} = {literal(value)}  # {p.name}")
+
+    def _pcg(self, w: PyWriter, result: "CompilationResult", variables: NameAllocator) -> None:
+        w.block(PCG_HELPERS)
+        material_exprs = {}
+        if result.materials:
+            w.block(MATERIAL_HELPERS)
+            w.blank()
+            w.line("def build_materials():")
+            w.indent()
+            w.line("created = {}")
+            for name, sub in result.materials.items():
+                w.blank()
+                inner = PyWriter()
+                function = write_material(self, sub, inner, NameAllocator(set(variables._used)))
+                w.block(inner.text())
+                w.line(f"created[{name!r}] = {function}()")
+            w.line("return created")
+            w.dedent()
+            material_exprs = {name: f"materials.get({name!r})" for name in result.materials}
+        w.blank()
+        w.line("def build():")
+        w.indent()
+        if result.materials:
+            w.line("materials = build_materials()")
+        w.line('factory_class = getattr(unreal, "PCGGraphFactory", None)')
+        w.line(f'graph = nb_create_asset("{unreal_asset_name(result.semantic.name, "PCG_")}", ASSET_PATH, unreal.PCGGraph, factory_class() if factory_class else None)')
+        w.line("input_node = graph.get_input_node()")
+        w.line("output_node = graph.get_output_node()")
+        builder = PcgBuilder(self, result, w, variables)
+        builder.materials = material_exprs
+        builder.build()
+        w.blank()
+        w.line("unreal.EditorAssetLibrary.save_loaded_asset(graph)")
+        w.line("if SPAWN_PCG_VOLUME:")
+        w.line("    actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)")
+        w.line("    volume = actors.spawn_actor_from_class(unreal.PCGVolume, unreal.Vector(0.0, 0.0, 0.0))")
+        w.line("    component = volume.get_component_by_class(unreal.PCGComponent)")
+        w.line("    component.set_graph(graph)")
+        w.line("return graph")
+        w.dedent()
+        w.blank()
+        w.line("graph = build()")
+        w.line('print("NodeBridge: created", graph.get_path_name())')
 
 
-def _generate_compositor(graph: SemanticGraph, options) -> tuple[str, list[TranslationRecord]]:
-    """Color operations become a post-process-style material. The rest are listed."""
-
-    asset = "NB_" + sanitize_identifier(graph.name)
-    lines = script_header(
-        "NodeBridge Unreal compositor fallback.",
-        f"Source: Compositor / {graph.name}",
-    )
-    lines.extend(
-        [
-            "def build(package_path='/Game/NodeBridge'):",
-            "    # Glare, vignette masks, and most filters have no honest Unreal material equivalent here.",
-            "    # Color operations are written into a material the user can assign to a post-process volume.",
-            "    tools = unreal.AssetToolsHelpers.get_asset_tools()",
-            "    material = tools.create_asset(" + repr(asset) + ", package_path, unreal.Material, unreal.MaterialFactoryNew())",
-            "    if material is None:",
-            "        raise RuntimeError('Could not create compositor fallback material')",
-            "    library = unreal.MaterialEditingLibrary",
-        ]
-    )
-    records = []
-    color_connected = False
-    for operation in graph.operations:
-        mode = str(operation.parameters.get("mode", ""))
-        if operation.kind is OperationKind.COMPOSITOR_OPERATION and mode in {"brightness", "color_balance", "color_correction", "exposure", "hue", "tonemap", "mix"}:
-            lines.append(f"    # operation: {operation.id} kind=compositor_operation confidence=approximate")
-            lines.append(f"    # {mode} is approximated by a post-process material constant. It is not the Blender compositor.")
-            if not color_connected:
-                lines.append("    color = library.create_material_expression(material, unreal.MaterialExpressionConstant3Vector, -300, 0)")
-                lines.append("    color.set_editor_property('constant', unreal.LinearColor(1.0, 1.0, 1.0, 1.0))")
-                lines.append("    library.connect_material_property(color, '', unreal.MaterialProperty.MP_EMISSIVE_COLOR)")
-                color_connected = True
-            records.append(
-                TranslationRecord(
-                    operation_id=operation.id,
-                    operation_name=operation.name,
-                    operation=operation.kind.value,
-                    classification=Classification(
-                        confidence=Confidence.APPROXIMATE,
-                        explanation=f"{mode} is only a color-material approximation of the compositor node.",
-                        implementation="post-process material",
-                        limitations=("This is not a compositor graph. Glare and masks are not reproduced.",),
-                    ),
-                    source_types=operation.source.node_types,
-                )
-            )
-        else:
-            reason = f"No Unreal compositor equivalent is implemented for {mode or operation.kind.value}."
-            lines.append(f"    # operation: {operation.id} kind={operation.kind.value} confidence=unsupported")
-            lines.append(f"    # {reason}")
-            records.append(
-                TranslationRecord(
-                    operation_id=operation.id,
-                    operation_name=operation.name,
-                    operation=operation.kind.value,
-                    classification=Classification(
-                        confidence=Confidence.UNSUPPORTED,
-                        explanation=reason,
-                        implementation="none",
-                        fallback="listed in the script and omitted from the material",
-                    ),
-                    source_types=operation.source.node_types,
-                )
-            )
-    lines.extend(
-        [
-            "    library.recompile_material(material)",
-            "    unreal.EditorAssetLibrary.save_asset(material.get_path_name())",
-            "    return material",
-            "",
-            "",
-            "if __name__ == '__main__':",
-            "    build()",
-            "",
-        ]
-    )
-    return "\n".join(lines), records
-
-
-_DEFAULTS = {
-    OperationKind.SCATTER: Classification(Confidence.EQUIVALENT, "PCG Surface Sampler.", "PCGSurfaceSamplerSettings"),
-    OperationKind.INSTANCE: Classification(Confidence.EQUIVALENT, "PCG Static Mesh Spawner.", "PCGStaticMeshSpawnerSettings"),
-    OperationKind.TRANSFORM: Classification(Confidence.APPROXIMATE, "PCG Transform Points when the class exists.", "PCGTransformPointsSettings"),
-    OperationKind.RANDOM_TRANSFORM: Classification(Confidence.APPROXIMATE, "PCG Transform Points.", "PCGTransformPointsSettings"),
-    OperationKind.PRIMITIVE: Classification(Confidence.APPROXIMATE, "No PCG primitive node. The graph input is the surface.", "graph input"),
-    OperationKind.GROUP_INPUT: Classification(Confidence.EQUIVALENT, "PCG graph input.", "PCGGraph input"),
-    OperationKind.GROUP_OUTPUT: Classification(Confidence.EXACT, "PCG graph output.", "PCGGraph output"),
-    OperationKind.REALIZE_INSTANCES: Classification(Confidence.EQUIVALENT, "Spawner output is already instanced.", "spawner output"),
-    OperationKind.MATH: Classification(Confidence.APPROXIMATE, "Not a first-class PCG node in this script.", "comment"),
-    OperationKind.NOISE: Classification(Confidence.APPROXIMATE, "MaterialExpressionNoise for shaders. Not exact.", "MaterialExpressionNoise"),
-    OperationKind.SHADER_OPERATION: Classification(Confidence.EQUIVALENT, "Unreal material expressions.", "MaterialEditingLibrary"),
-    OperationKind.COMPOSITOR_OPERATION: Classification(Confidence.APPROXIMATE, "Only color operations have a material fallback.", "post-process material"),
-    OperationKind.SUBGRAPH: Classification(Confidence.APPROXIMATE, "PCGSubgraphSettings when the class exists.", "PCGSubgraphSettings"),
-    OperationKind.UNSUPPORTED: Classification(Confidence.UNSUPPORTED, "No Unreal implementation.", "none"),
-}
+register_backend(UnrealBackend())

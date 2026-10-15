@@ -1,5 +1,6 @@
-"""Blender source frontend."""
+"""Blender frontend: bpy -> Graph IR -> Semantic IR."""
 
-from nodebridge.frontend.blender.frontend import BlenderFrontend
+from . import compositor_nodes, geometry_nodes, shader_nodes  # noqa: F401  (register lifters)
+from .frontend import BlenderFrontend
 
 __all__ = ["BlenderFrontend"]

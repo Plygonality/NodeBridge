@@ -1,19 +1,28 @@
-"""Optional fallback when the compiler has no target implementation.
+"""Optional fallback interface for operations no translator handles.
 
-The default provider is ``None``. Graph translation does not call an LLM,
-a cloud API, or any local model. A later provider can implement this
-interface and return a comment. The compiler will not execute that text.
+NodeBridge's translation is deterministic and does not need an AI
+service. A ``TranslationFallbackProvider`` may be plugged in later (for
+example an LLM-backed suggester), but its output is only ever added to
+the report as a suggestion for a human; it is never executed or counted
+as a translation. The default is ``fallback = None``.
 """
 
 from __future__ import annotations
 
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
 
-from nodebridge.ir.semantic import Operation
+
+@dataclass
+class FallbackSuggestion:
+    summary: str
+    code: str = ""
+    provider: str = ""
 
 
+@runtime_checkable
 class TranslationFallbackProvider(Protocol):
-    """Suggest a human-readable fallback for an unsupported operation."""
+    name: str
 
-    def suggest(self, operation: Operation, target: str, reason: str) -> str | None:
-        """Return a comment, or ``None`` when there is nothing to add."""
+    def suggest(self, op, graph, target: str) -> FallbackSuggestion | None:  # pragma: no cover - protocol
+        ...

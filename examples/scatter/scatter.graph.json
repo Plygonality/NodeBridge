@@ -1,0 +1,2533 @@
+{
+  "format": "nodebridge.graph",
+  "format_version": 1,
+  "nodebridge_version": "0.3.0",
+  "root": "ScatterRocks",
+  "source": {
+    "application": "Blender 4.2.23 LTS",
+    "display_name": "ScatterRocks",
+    "unit_scale": 1.0,
+    "fps": 24.0,
+    "object": "Ground",
+    "modifier": "NodeBridge Example",
+    "object_dimensions": [
+      20.0,
+      20.0,
+      0.0
+    ],
+    "tree_kind": "geometry",
+    "tree": "ScatterRocks",
+    "materials": {
+      "ProceduralRock": "Material:ProceduralRock"
+    }
+  },
+  "trees": [
+    {
+      "name": "ScatterRocks",
+      "kind": "geometry",
+      "is_group": false,
+      "interface": [
+        {
+          "identifier": "Socket_6",
+          "name": "Geometry",
+          "in_out": "OUTPUT",
+          "type": "geometry"
+        },
+        {
+          "identifier": "Socket_0",
+          "name": "Geometry",
+          "in_out": "INPUT",
+          "type": "geometry"
+        },
+        {
+          "identifier": "Socket_1",
+          "name": "Density",
+          "in_out": "INPUT",
+          "type": "float",
+          "default": 4.0,
+          "min_value": 0.0,
+          "max_value": 100.0,
+          "value": 4.0
+        },
+        {
+          "identifier": "Socket_2",
+          "name": "Seed",
+          "in_out": "INPUT",
+          "type": "int",
+          "default": 7,
+          "min_value": -2147483648,
+          "max_value": 2147483647,
+          "value": 7
+        },
+        {
+          "identifier": "Socket_3",
+          "name": "Scale Min",
+          "in_out": "INPUT",
+          "type": "float",
+          "default": 0.6,
+          "min_value": 0.0,
+          "max_value": 10.0,
+          "value": 0.6
+        },
+        {
+          "identifier": "Socket_4",
+          "name": "Scale Max",
+          "in_out": "INPUT",
+          "type": "float",
+          "default": 1.4,
+          "min_value": 0.0,
+          "max_value": 10.0,
+          "value": 1.4
+        },
+        {
+          "identifier": "Socket_5",
+          "name": "Coverage",
+          "in_out": "INPUT",
+          "type": "float",
+          "subtype": "FACTOR",
+          "default": 0.45,
+          "min_value": 0.0,
+          "max_value": 1.0,
+          "value": 0.45
+        }
+      ],
+      "nodes": [
+        {
+          "id": "Group Input",
+          "type": "NodeGroupInput",
+          "inputs": [],
+          "outputs": [
+            {
+              "identifier": "Socket_0",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Socket_1",
+              "name": "Density",
+              "type": "float",
+              "default": 4.0,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_2",
+              "name": "Seed",
+              "type": "int",
+              "default": 7,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_3",
+              "name": "Scale Min",
+              "type": "float",
+              "default": 0.6,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_4",
+              "name": "Scale Max",
+              "type": "float",
+              "default": 1.4,
+              "linked": true
+            },
+            {
+              "identifier": "Socket_5",
+              "name": "Coverage",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.45,
+              "linked": true
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Group Output",
+          "type": "NodeGroupOutput",
+          "inputs": [
+            {
+              "identifier": "Socket_6",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "outputs": [],
+          "parameters": {
+            "is_active_output": true
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Scatter Rocks",
+          "type": "GeometryNodeDistributePointsOnFaces",
+          "label": "Scatter Rocks",
+          "inputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Distance Min",
+              "name": "Distance Min",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Density Max",
+              "name": "Density Max",
+              "type": "float",
+              "default": 10.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Density",
+              "name": "Density",
+              "type": "float",
+              "default": 10.0,
+              "linked": true
+            },
+            {
+              "identifier": "Density Factor",
+              "name": "Density Factor",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 1.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Seed",
+              "name": "Seed",
+              "type": "int",
+              "default": 0,
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Points",
+              "name": "Points",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Normal",
+              "name": "Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Rotation",
+              "name": "Rotation",
+              "type": "rotation",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "parameters": {
+            "distribute_method": "RANDOM",
+            "use_legacy_normal": false
+          },
+          "internal_links": [
+            [
+              "Mesh",
+              "Points"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Coverage Noise",
+          "type": "ShaderNodeTexNoise",
+          "label": "Coverage Noise",
+          "inputs": [
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "W",
+              "name": "W",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Scale",
+              "name": "Scale",
+              "type": "float",
+              "default": 0.35
+            },
+            {
+              "identifier": "Detail",
+              "name": "Detail",
+              "type": "float",
+              "default": 3.0
+            },
+            {
+              "identifier": "Roughness",
+              "name": "Roughness",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.5
+            },
+            {
+              "identifier": "Lacunarity",
+              "name": "Lacunarity",
+              "type": "float",
+              "default": 2.0
+            },
+            {
+              "identifier": "Offset",
+              "name": "Offset",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Gain",
+              "name": "Gain",
+              "type": "float",
+              "default": 1.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Distortion",
+              "name": "Distortion",
+              "type": "float",
+              "default": 0.0
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Fac",
+              "name": "Fac",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "Color",
+              "name": "Color",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ]
+            }
+          ],
+          "parameters": {
+            "noise_dimensions": "3D",
+            "noise_type": "FBM",
+            "normalize": true
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Coverage Remap",
+          "type": "ShaderNodeMapRange",
+          "inputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "From Min",
+              "name": "From Min",
+              "type": "float",
+              "default": 0.3
+            },
+            {
+              "identifier": "From Max",
+              "name": "From Max",
+              "type": "float",
+              "default": 0.7
+            },
+            {
+              "identifier": "To Min",
+              "name": "To Min",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "To Max",
+              "name": "To Max",
+              "type": "float",
+              "default": 1.0
+            },
+            {
+              "identifier": "Steps",
+              "name": "Steps",
+              "type": "float",
+              "default": 4.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "From_Min_FLOAT3",
+              "name": "From Min",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "From_Max_FLOAT3",
+              "name": "From Max",
+              "type": "vector3",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "To_Min_FLOAT3",
+              "name": "To Min",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "To_Max_FLOAT3",
+              "name": "To Max",
+              "type": "vector3",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Steps_FLOAT3",
+              "name": "Steps",
+              "type": "vector3",
+              "default": [
+                4.0,
+                4.0,
+                4.0
+              ],
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Result",
+              "name": "Result",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            }
+          ],
+          "parameters": {
+            "clamp": true,
+            "interpolation_type": "LINEAR",
+            "data_type": "FLOAT"
+          },
+          "internal_links": [
+            [
+              "Value",
+              "Result"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Coverage Threshold",
+          "type": "FunctionNodeCompare",
+          "inputs": [
+            {
+              "identifier": "A",
+              "name": "A",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "B",
+              "name": "B",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "A_INT",
+              "name": "A",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "B_INT",
+              "name": "B",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "A_VEC3",
+              "name": "A",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "B_VEC3",
+              "name": "B",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "A_COL",
+              "name": "A",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "B_COL",
+              "name": "B",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "A_STR",
+              "name": "A",
+              "type": "string",
+              "default": "",
+              "enabled": false
+            },
+            {
+              "identifier": "B_STR",
+              "name": "B",
+              "type": "string",
+              "default": "",
+              "enabled": false
+            },
+            {
+              "identifier": "C",
+              "name": "C",
+              "type": "float",
+              "default": 0.9,
+              "enabled": false
+            },
+            {
+              "identifier": "Angle",
+              "name": "Angle",
+              "type": "float",
+              "subtype": "ANGLE",
+              "default": 0.087266,
+              "enabled": false
+            },
+            {
+              "identifier": "Epsilon",
+              "name": "Epsilon",
+              "type": "float",
+              "default": 0.001,
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Result",
+              "name": "Result",
+              "type": "bool",
+              "default": false,
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "operation": "LESS_THAN",
+            "data_type": "FLOAT",
+            "mode": "ELEMENT"
+          },
+          "internal_links": [
+            [
+              "A",
+              "Result"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Remove Sparse Areas",
+          "type": "GeometryNodeDeleteGeometry",
+          "label": "Remove Sparse Areas",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true,
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "mode": "ALL",
+            "domain": "POINT"
+          },
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Rock Shape",
+          "type": "GeometryNodeMeshIcoSphere",
+          "label": "Rock Shape",
+          "inputs": [
+            {
+              "identifier": "Radius",
+              "name": "Radius",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 0.25
+            },
+            {
+              "identifier": "Subdivisions",
+              "name": "Subdivisions",
+              "type": "int",
+              "default": 2
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Mesh",
+              "name": "Mesh",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "UV Map",
+              "name": "UV Map",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Sink Rock",
+          "type": "GeometryNodeTransform",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Translation",
+              "name": "Translation",
+              "type": "vector3",
+              "subtype": "TRANSLATION",
+              "default": [
+                0.0,
+                0.0,
+                -0.05
+              ]
+            },
+            {
+              "identifier": "Rotation",
+              "name": "Rotation",
+              "type": "rotation",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Scale",
+              "name": "Scale",
+              "type": "vector3",
+              "subtype": "XYZ",
+              "default": [
+                1.0,
+                1.0,
+                0.6
+              ]
+            },
+            {
+              "identifier": "Transform",
+              "name": "Transform",
+              "type": "matrix",
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "mode": "COMPONENTS"
+          },
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Rock Material",
+          "type": "GeometryNodeSetMaterial",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Material",
+              "name": "Material",
+              "type": "material",
+              "default": {
+                "id_type": "Material",
+                "name": "ProceduralRock"
+              }
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Random Scale",
+          "type": "FunctionNodeRandomValue",
+          "label": "Random Scale",
+          "inputs": [
+            {
+              "identifier": "Min",
+              "name": "Min",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Max",
+              "name": "Max",
+              "type": "vector3",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Min_001",
+              "name": "Min",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "Max_001",
+              "name": "Max",
+              "type": "float",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Min_002",
+              "name": "Min",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "Max_002",
+              "name": "Max",
+              "type": "int",
+              "default": 100,
+              "enabled": false
+            },
+            {
+              "identifier": "Probability",
+              "name": "Probability",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.5,
+              "enabled": false
+            },
+            {
+              "identifier": "ID",
+              "name": "ID",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "identifier": "Seed",
+              "name": "Seed",
+              "type": "int",
+              "default": 0,
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Value_001",
+              "name": "Value",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "Value_002",
+              "name": "Value",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "Value_003",
+              "name": "Value",
+              "type": "bool",
+              "default": false,
+              "enabled": false
+            }
+          ],
+          "parameters": {
+            "data_type": "FLOAT"
+          },
+          "internal_links": [
+            [
+              "Min_001",
+              "Value_001"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Place Rocks",
+          "type": "GeometryNodeInstanceOnPoints",
+          "label": "Place Rocks",
+          "inputs": [
+            {
+              "identifier": "Points",
+              "name": "Points",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Instance",
+              "name": "Instance",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Pick Instance",
+              "name": "Pick Instance",
+              "type": "bool",
+              "default": false
+            },
+            {
+              "identifier": "Instance Index",
+              "name": "Instance Index",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "identifier": "Rotation",
+              "name": "Rotation",
+              "type": "rotation",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Scale",
+              "name": "Scale",
+              "type": "vector3",
+              "subtype": "XYZ",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Instances",
+              "name": "Instances",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Points",
+              "Instances"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Random Rotation",
+          "type": "FunctionNodeRandomValue",
+          "label": "Random Rotation",
+          "inputs": [
+            {
+              "identifier": "Min",
+              "name": "Min",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Max",
+              "name": "Max",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                6.283185
+              ]
+            },
+            {
+              "identifier": "Min_001",
+              "name": "Min",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Max_001",
+              "name": "Max",
+              "type": "float",
+              "default": 1.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Min_002",
+              "name": "Min",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "Max_002",
+              "name": "Max",
+              "type": "int",
+              "default": 100,
+              "enabled": false
+            },
+            {
+              "identifier": "Probability",
+              "name": "Probability",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.5,
+              "enabled": false
+            },
+            {
+              "identifier": "ID",
+              "name": "ID",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "identifier": "Seed",
+              "name": "Seed",
+              "type": "int",
+              "default": 3
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Value_001",
+              "name": "Value",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Value_002",
+              "name": "Value",
+              "type": "int",
+              "default": 0,
+              "enabled": false
+            },
+            {
+              "identifier": "Value_003",
+              "name": "Value",
+              "type": "bool",
+              "default": false,
+              "enabled": false
+            }
+          ],
+          "parameters": {
+            "data_type": "FLOAT_VECTOR"
+          },
+          "internal_links": [
+            [
+              "Min",
+              "Value"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Random Yaw",
+          "type": "GeometryNodeRotateInstances",
+          "label": "Random Yaw",
+          "inputs": [
+            {
+              "identifier": "Instances",
+              "name": "Instances",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Rotation",
+              "name": "Rotation",
+              "type": "rotation",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Pivot Point",
+              "name": "Pivot Point",
+              "type": "vector3",
+              "subtype": "TRANSLATION",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Local Space",
+              "name": "Local Space",
+              "type": "bool",
+              "default": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Instances",
+              "name": "Instances",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Instances",
+              "Instances"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Realize Instances",
+          "type": "GeometryNodeRealizeInstances",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            },
+            {
+              "identifier": "Selection",
+              "name": "Selection",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Realize All",
+              "name": "Realize All",
+              "type": "bool",
+              "default": true
+            },
+            {
+              "identifier": "Depth",
+              "name": "Depth",
+              "type": "int",
+              "default": 0
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Join Geometry",
+          "type": "GeometryNodeJoinGeometry",
+          "inputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Geometry",
+              "name": "Geometry",
+              "type": "geometry",
+              "linked": true
+            }
+          ],
+          "internal_links": [
+            [
+              "Geometry",
+              "Geometry"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": [
+            "Group Input",
+            "Socket_0"
+          ],
+          "to": [
+            "Scatter Rocks",
+            "Mesh"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_1"
+          ],
+          "to": [
+            "Scatter Rocks",
+            "Density"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_2"
+          ],
+          "to": [
+            "Scatter Rocks",
+            "Seed"
+          ]
+        },
+        {
+          "from": [
+            "Coverage Noise",
+            "Fac"
+          ],
+          "to": [
+            "Coverage Remap",
+            "Value"
+          ]
+        },
+        {
+          "from": [
+            "Coverage Remap",
+            "Result"
+          ],
+          "to": [
+            "Coverage Threshold",
+            "A"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_5"
+          ],
+          "to": [
+            "Coverage Threshold",
+            "B"
+          ]
+        },
+        {
+          "from": [
+            "Scatter Rocks",
+            "Points"
+          ],
+          "to": [
+            "Remove Sparse Areas",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Coverage Threshold",
+            "Result"
+          ],
+          "to": [
+            "Remove Sparse Areas",
+            "Selection"
+          ]
+        },
+        {
+          "from": [
+            "Rock Shape",
+            "Mesh"
+          ],
+          "to": [
+            "Sink Rock",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Sink Rock",
+            "Geometry"
+          ],
+          "to": [
+            "Rock Material",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_3"
+          ],
+          "to": [
+            "Random Scale",
+            "Min_001"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_4"
+          ],
+          "to": [
+            "Random Scale",
+            "Max_001"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_2"
+          ],
+          "to": [
+            "Random Scale",
+            "Seed"
+          ]
+        },
+        {
+          "from": [
+            "Remove Sparse Areas",
+            "Geometry"
+          ],
+          "to": [
+            "Place Rocks",
+            "Points"
+          ]
+        },
+        {
+          "from": [
+            "Rock Material",
+            "Geometry"
+          ],
+          "to": [
+            "Place Rocks",
+            "Instance"
+          ]
+        },
+        {
+          "from": [
+            "Random Scale",
+            "Value_001"
+          ],
+          "to": [
+            "Place Rocks",
+            "Scale"
+          ]
+        },
+        {
+          "from": [
+            "Place Rocks",
+            "Instances"
+          ],
+          "to": [
+            "Random Yaw",
+            "Instances"
+          ]
+        },
+        {
+          "from": [
+            "Random Rotation",
+            "Value"
+          ],
+          "to": [
+            "Random Yaw",
+            "Rotation"
+          ]
+        },
+        {
+          "from": [
+            "Random Yaw",
+            "Instances"
+          ],
+          "to": [
+            "Realize Instances",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Realize Instances",
+            "Geometry"
+          ],
+          "to": [
+            "Join Geometry",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Group Input",
+            "Socket_0"
+          ],
+          "to": [
+            "Join Geometry",
+            "Geometry"
+          ]
+        },
+        {
+          "from": [
+            "Join Geometry",
+            "Geometry"
+          ],
+          "to": [
+            "Group Output",
+            "Socket_6"
+          ]
+        }
+      ],
+      "metadata": {
+        "blender_name": "ScatterRocks"
+      }
+    },
+    {
+      "name": "Material:ProceduralRock",
+      "kind": "shader",
+      "is_group": false,
+      "interface": [],
+      "nodes": [
+        {
+          "id": "Material Output",
+          "type": "ShaderNodeOutputMaterial",
+          "inputs": [
+            {
+              "identifier": "Surface",
+              "name": "Surface",
+              "type": "shader",
+              "linked": true
+            },
+            {
+              "identifier": "Volume",
+              "name": "Volume",
+              "type": "shader"
+            },
+            {
+              "identifier": "Displacement",
+              "name": "Displacement",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Thickness",
+              "name": "Thickness",
+              "type": "float",
+              "default": 0.0
+            }
+          ],
+          "outputs": [],
+          "parameters": {
+            "is_active_output": true,
+            "target": "ALL"
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Principled BSDF",
+          "type": "ShaderNodeBsdfPrincipled",
+          "inputs": [
+            {
+              "identifier": "Base Color",
+              "name": "Base Color",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Metallic",
+              "name": "Metallic",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.0
+            },
+            {
+              "identifier": "Roughness",
+              "name": "Roughness",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.5,
+              "linked": true
+            },
+            {
+              "identifier": "IOR",
+              "name": "IOR",
+              "type": "float",
+              "default": 1.5
+            },
+            {
+              "identifier": "Alpha",
+              "name": "Alpha",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 1.0
+            },
+            {
+              "identifier": "Normal",
+              "name": "Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Weight",
+              "name": "Weight",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Subsurface Weight",
+              "name": "Subsurface Weight",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.0
+            },
+            {
+              "identifier": "Subsurface Radius",
+              "name": "Subsurface Radius",
+              "type": "vector3",
+              "default": [
+                1.0,
+                0.2,
+                0.1
+              ]
+            },
+            {
+              "identifier": "Subsurface Scale",
+              "name": "Subsurface Scale",
+              "type": "float",
+              "subtype": "DISTANCE",
+              "default": 0.05
+            },
+            {
+              "identifier": "Subsurface IOR",
+              "name": "Subsurface IOR",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 1.4,
+              "enabled": false
+            },
+            {
+              "identifier": "Subsurface Anisotropy",
+              "name": "Subsurface Anisotropy",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.0
+            },
+            {
+              "identifier": "Specular IOR Level",
+              "name": "Specular IOR Level",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.5
+            },
+            {
+              "identifier": "Specular Tint",
+              "name": "Specular Tint",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "identifier": "Anisotropic",
+              "name": "Anisotropic",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.0
+            },
+            {
+              "identifier": "Anisotropic Rotation",
+              "name": "Anisotropic Rotation",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.0
+            },
+            {
+              "identifier": "Tangent",
+              "name": "Tangent",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Transmission Weight",
+              "name": "Transmission Weight",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.0
+            },
+            {
+              "identifier": "Coat Weight",
+              "name": "Coat Weight",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.0
+            },
+            {
+              "identifier": "Coat Roughness",
+              "name": "Coat Roughness",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.03
+            },
+            {
+              "identifier": "Coat IOR",
+              "name": "Coat IOR",
+              "type": "float",
+              "default": 1.5
+            },
+            {
+              "identifier": "Coat Tint",
+              "name": "Coat Tint",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "identifier": "Coat Normal",
+              "name": "Coat Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Sheen Weight",
+              "name": "Sheen Weight",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.0
+            },
+            {
+              "identifier": "Sheen Roughness",
+              "name": "Sheen Roughness",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.5
+            },
+            {
+              "identifier": "Sheen Tint",
+              "name": "Sheen Tint",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "identifier": "Emission Color",
+              "name": "Emission Color",
+              "type": "color",
+              "default": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ]
+            },
+            {
+              "identifier": "Emission Strength",
+              "name": "Emission Strength",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "Thin Film Thickness",
+              "name": "Thin Film Thickness",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "Thin Film IOR",
+              "name": "Thin Film IOR",
+              "type": "float",
+              "default": 1.33
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "BSDF",
+              "name": "BSDF",
+              "type": "shader",
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "distribution": "MULTI_GGX",
+            "subsurface_method": "RANDOM_WALK"
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Texture Coordinate",
+          "type": "ShaderNodeTexCoord",
+          "inputs": [],
+          "outputs": [
+            {
+              "identifier": "Generated",
+              "name": "Generated",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Normal",
+              "name": "Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "UV",
+              "name": "UV",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Object",
+              "name": "Object",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Camera",
+              "name": "Camera",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Window",
+              "name": "Window",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Reflection",
+              "name": "Reflection",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "parameters": {
+            "object": null,
+            "from_instancer": false
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Mapping",
+          "type": "ShaderNodeMapping",
+          "inputs": [
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Location",
+              "name": "Location",
+              "type": "vector3",
+              "subtype": "TRANSLATION",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Rotation",
+              "name": "Rotation",
+              "type": "vector3",
+              "subtype": "EULER",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "identifier": "Scale",
+              "name": "Scale",
+              "type": "vector3",
+              "subtype": "XYZ",
+              "default": [
+                2.0,
+                2.0,
+                2.0
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "vector_type": "POINT"
+          },
+          "internal_links": [
+            [
+              "Vector",
+              "Vector"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Rock Noise",
+          "type": "ShaderNodeTexNoise",
+          "label": "Rock Noise",
+          "inputs": [
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "W",
+              "name": "W",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Scale",
+              "name": "Scale",
+              "type": "float",
+              "default": 4.0
+            },
+            {
+              "identifier": "Detail",
+              "name": "Detail",
+              "type": "float",
+              "default": 8.0
+            },
+            {
+              "identifier": "Roughness",
+              "name": "Roughness",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.6
+            },
+            {
+              "identifier": "Lacunarity",
+              "name": "Lacunarity",
+              "type": "float",
+              "default": 2.0
+            },
+            {
+              "identifier": "Offset",
+              "name": "Offset",
+              "type": "float",
+              "default": 0.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Gain",
+              "name": "Gain",
+              "type": "float",
+              "default": 1.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Distortion",
+              "name": "Distortion",
+              "type": "float",
+              "default": 0.0
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Fac",
+              "name": "Fac",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "Color",
+              "name": "Color",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ]
+            }
+          ],
+          "parameters": {
+            "noise_dimensions": "3D",
+            "noise_type": "FBM",
+            "normalize": true
+          },
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Rock Colors",
+          "type": "ShaderNodeValToRGB",
+          "label": "Rock Colors",
+          "inputs": [
+            {
+              "identifier": "Fac",
+              "name": "Fac",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.5,
+              "linked": true
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Color",
+              "name": "Color",
+              "type": "color",
+              "default": [
+                0.8,
+                0.8,
+                0.8,
+                1.0
+              ],
+              "linked": true
+            },
+            {
+              "identifier": "Alpha",
+              "name": "Alpha",
+              "type": "float",
+              "default": 0.0
+            }
+          ],
+          "parameters": {
+            "color_ramp": {
+              "interpolation": "LINEAR",
+              "color_mode": "RGB",
+              "elements": [
+                [
+                  0.3,
+                  [
+                    0.08,
+                    0.07,
+                    0.06,
+                    1.0
+                  ]
+                ],
+                [
+                  0.5,
+                  [
+                    0.25,
+                    0.2,
+                    0.15,
+                    1.0
+                  ]
+                ],
+                [
+                  0.75,
+                  [
+                    0.55,
+                    0.5,
+                    0.42,
+                    1.0
+                  ]
+                ]
+              ]
+            }
+          },
+          "internal_links": [
+            [
+              "Fac",
+              "Color"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Value",
+          "type": "ShaderNodeValue",
+          "label": "Roughness Scale",
+          "inputs": [],
+          "outputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 0.9,
+              "linked": true
+            }
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Roughness Range",
+          "type": "ShaderNodeMapRange",
+          "label": "Roughness Range",
+          "inputs": [
+            {
+              "identifier": "Value",
+              "name": "Value",
+              "type": "float",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "From Min",
+              "name": "From Min",
+              "type": "float",
+              "default": 0.0
+            },
+            {
+              "identifier": "From Max",
+              "name": "From Max",
+              "type": "float",
+              "default": 1.0
+            },
+            {
+              "identifier": "To Min",
+              "name": "To Min",
+              "type": "float",
+              "default": 0.45
+            },
+            {
+              "identifier": "To Max",
+              "name": "To Max",
+              "type": "float",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Steps",
+              "name": "Steps",
+              "type": "float",
+              "default": 4.0,
+              "enabled": false
+            },
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "From_Min_FLOAT3",
+              "name": "From Min",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "From_Max_FLOAT3",
+              "name": "From Max",
+              "type": "vector3",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "To_Min_FLOAT3",
+              "name": "To Min",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "To_Max_FLOAT3",
+              "name": "To Max",
+              "type": "vector3",
+              "default": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "enabled": false
+            },
+            {
+              "identifier": "Steps_FLOAT3",
+              "name": "Steps",
+              "type": "vector3",
+              "default": [
+                4.0,
+                4.0,
+                4.0
+              ],
+              "enabled": false
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Result",
+              "name": "Result",
+              "type": "float",
+              "default": 0.0,
+              "linked": true
+            },
+            {
+              "identifier": "Vector",
+              "name": "Vector",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "enabled": false
+            }
+          ],
+          "parameters": {
+            "clamp": true,
+            "interpolation_type": "LINEAR",
+            "data_type": "FLOAT"
+          },
+          "internal_links": [
+            [
+              "Value",
+              "Result"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Rock Bump",
+          "type": "ShaderNodeBump",
+          "label": "Rock Bump",
+          "inputs": [
+            {
+              "identifier": "Strength",
+              "name": "Strength",
+              "type": "float",
+              "subtype": "FACTOR",
+              "default": 0.35
+            },
+            {
+              "identifier": "Distance",
+              "name": "Distance",
+              "type": "float",
+              "default": 1.0
+            },
+            {
+              "identifier": "Height",
+              "name": "Height",
+              "type": "float",
+              "default": 1.0,
+              "linked": true
+            },
+            {
+              "identifier": "Normal",
+              "name": "Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "identifier": "Normal",
+              "name": "Normal",
+              "type": "vector3",
+              "default": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "linked": true
+            }
+          ],
+          "parameters": {
+            "invert": false
+          },
+          "internal_links": [
+            [
+              "Normal",
+              "Normal"
+            ]
+          ],
+          "location": [
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": [
+            "Principled BSDF",
+            "BSDF"
+          ],
+          "to": [
+            "Material Output",
+            "Surface"
+          ]
+        },
+        {
+          "from": [
+            "Texture Coordinate",
+            "Object"
+          ],
+          "to": [
+            "Mapping",
+            "Vector"
+          ]
+        },
+        {
+          "from": [
+            "Mapping",
+            "Vector"
+          ],
+          "to": [
+            "Rock Noise",
+            "Vector"
+          ]
+        },
+        {
+          "from": [
+            "Rock Noise",
+            "Fac"
+          ],
+          "to": [
+            "Rock Colors",
+            "Fac"
+          ]
+        },
+        {
+          "from": [
+            "Rock Colors",
+            "Color"
+          ],
+          "to": [
+            "Principled BSDF",
+            "Base Color"
+          ]
+        },
+        {
+          "from": [
+            "Rock Noise",
+            "Fac"
+          ],
+          "to": [
+            "Roughness Range",
+            "Value"
+          ]
+        },
+        {
+          "from": [
+            "Value",
+            "Value"
+          ],
+          "to": [
+            "Roughness Range",
+            "To Max"
+          ]
+        },
+        {
+          "from": [
+            "Roughness Range",
+            "Result"
+          ],
+          "to": [
+            "Principled BSDF",
+            "Roughness"
+          ]
+        },
+        {
+          "from": [
+            "Rock Noise",
+            "Fac"
+          ],
+          "to": [
+            "Rock Bump",
+            "Height"
+          ]
+        },
+        {
+          "from": [
+            "Rock Bump",
+            "Normal"
+          ],
+          "to": [
+            "Principled BSDF",
+            "Normal"
+          ]
+        }
+      ],
+      "metadata": {
+        "blender_name": "Shader Nodetree",
+        "material": "ProceduralRock"
+      }
+    }
+  ]
+}

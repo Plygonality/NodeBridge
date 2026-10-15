@@ -1,12 +1,16 @@
-"""NodeBridge — a cross-DCC procedural compiler.
+"""NodeBridge: a cross-DCC procedural compiler.
 
-NodeBridge translates procedural meaning. Source nodes are syntax. The
-semantic IR is the meaning. Target backends choose a native implementation.
+NodeBridge reads procedural node trees in Blender, translates their
+procedural intent through a typed intermediate representation, and
+generates code that builds a native procedural system in another DCC.
 
-Importing this package does not require Blender, Houdini, or Unreal.
+This package is both a pure-Python library and a Blender add-on. The
+compiler never imports ``bpy``; only ``nodebridge.addon`` and
+``nodebridge.frontend.blender.context`` touch the Blender API, and only
+when Blender loads the add-on. All internal imports are relative so the
+package works as a Blender 4.2+ extension (``bl_ext.*.nodebridge``), as a
+legacy add-on, and as a normal Python package.
 """
-
-from nodebridge.ir.serialization import IR_VERSION
 
 __version__ = "0.3.0"
 
@@ -15,33 +19,19 @@ bl_info = {
     "author": "NodeBridge Contributors",
     "version": (0, 3, 0),
     "blender": (4, 2, 0),
-    "location": "View3D and Node Editor > Sidebar > NodeBridge",
-    "description": "Cross-DCC procedural compiler for Geometry Nodes, shaders, and the compositor",
+    "location": "Node Editor > Sidebar (N) > NodeBridge",
+    "description": "Compile Geometry, Shader and Compositor node trees into native Houdini or Unreal Engine 5 code.",
     "category": "Node",
 }
 
-__all__ = ["IR_VERSION", "__version__", "bl_info"]
-
 
 def register() -> None:
-    """Register the Blender add-on. Outside Blender this is a no-op."""
+    from . import addon
 
-    try:
-        import bpy  # type: ignore
-    except ImportError:
-        return
-    from nodebridge.addon import register as register_addon
-
-    register_addon(bpy)
+    addon.register()
 
 
 def unregister() -> None:
-    """Unregister the Blender add-on. Outside Blender this is a no-op."""
+    from . import addon
 
-    try:
-        import bpy  # type: ignore
-    except ImportError:
-        return
-    from nodebridge.addon import unregister as unregister_addon
-
-    unregister_addon(bpy)
+    addon.unregister()

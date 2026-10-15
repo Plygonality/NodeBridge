@@ -1,32 +1,15 @@
-"""Blender add-on registration.
+"""Blender add-on UI. Contains no translation logic; it calls the compiler."""
 
-``bpy`` is passed in by :func:`nodebridge.register`. This package imports
-without Blender.
-"""
+from . import operators, panels, properties
 
-from __future__ import annotations
-
-_CLASSES = []
+MODULES = (properties, operators, panels)
 
 
-def register(bpy) -> None:
-    """Register the NodeBridge N-panel and operators."""
-
-    global _CLASSES
-    from nodebridge.addon.ui import build_classes
-
-    _CLASSES = build_classes(bpy)
-    for cls in _CLASSES:
-        bpy.utils.register_class(cls)
-    bpy.types.Scene.nodebridge = bpy.props.PointerProperty(type=_CLASSES[0])
+def register() -> None:
+    for module in MODULES:
+        module.register()
 
 
-def unregister(bpy) -> None:
-    """Remove the NodeBridge N-panel and operators."""
-
-    global _CLASSES
-    if hasattr(bpy.types.Scene, "nodebridge"):
-        del bpy.types.Scene.nodebridge
-    for cls in reversed(_CLASSES):
-        bpy.utils.unregister_class(cls)
-    _CLASSES = []
+def unregister() -> None:
+    for module in reversed(MODULES):
+        module.unregister()

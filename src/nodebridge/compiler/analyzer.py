@@ -1,122 +1,200 @@
-"""Dependency analysis for a source graph.
+"""Dependency analysis built from socket connections only.
 
-Ordering comes from socket links. Node editor coordinates are ignored.
+Editor node locations are never used for ordering. The same generic
+algorithms serve the Graph IR (node level) and the Semantic IR.
 """
 
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from typing import Hashable, Iterable
 
-from nodebridge.ir.graph import NodeTree
+from ..ir.graph import NodeTree, TreeKind
 
-_STRUCTURAL = {"NodeReroute", "NodeFrame"}
-_OUTPUTS = {
-    "NodeGroupOutput",
-    "ShaderNodeOutputMaterial",
-    "CompositorNodeComposite",
-    "CompositorNodeViewer",
-    "CompositorNodeOutputFile",
+OUTPUT_NODE_TYPES = {
+    TreeKind.GEOMETRY: {"NodeGroupOutput"},
+    TreeKind.SHADER: {"ShaderNodeOutputMaterial", "ShaderNodeOutputWorld", "ShaderNodeOutputLight", "ShaderNodeOutputAOV", "NodeGroupOutput"},
+    TreeKind.COMPOSITOR: {"CompositorNodeComposite", "CompositorNodeViewer", "CompositorNodeOutputFile", "NodeGroupOutput"},
 }
+IGNORED_NODE_TYPES = {"NodeFrame"}
+
+
+def topological_sort(nodes: Iterable[Hashable], edges: Iterable[tuple[Hashable, Hashable]]) -> tuple[list, set]:
+    """Kahn's algorithm with stable ordering.
+
+    Returns ``(order, cyclic)`` where ``cyclic`` holds nodes that are part
+    of, or downstream of, a cycle and therefore could not be ordered.
+    """
+    node_list = list(dict.fromkeys(nodes))
+    position = {node: index for index, node in enumerate(node_list)}
+    indegree = {node: 0 for node in node_list}
+    successors: dict = defaultdict(list)
+    for source, target in edges:
+        if source not in indegree or target not in indegree:
+            continue
+        successors[source].append(target)
+        indegree[target] += 1
+    ready = deque(sorted((n for n in node_list if indegree[n] == 0), key=position.__getitem__))
+    order = []
+    while ready:
+        node = ready.popleft()
+        order.append(node)
+        for nxt in sorted(successors[node], key=position.__getitem__):
+            indegree[nxt] -= 1
+            if indegree[nxt] == 0:
+                ready.append(nxt)
+    cyclic = {n for n in node_list if indegree[n] > 0}
+    return order, cyclic
+
+
+def find_cycles(nodes: Iterable[Hashable], edges: Iterable[tuple[Hashable, Hashable]]) -> list[list]:
+    """Strongly connected components with more than one node (or a self loop)."""
+    node_list = list(dict.fromkeys(nodes))
+    adjacency: dict = defaultdict(list)
+    self_loops = set()
+    for source, target in edges:
+        adjacency[source].append(target)
+        if source == target:
+            self_loops.add(source)
+    index_of: dict = {}
+    low: dict = {}
+    stack: list = []
+    on_stack: set = set()
+    result: list[list] = []
+    counter = [0]
+
+    def strongconnect(start):
+        work = [(start, iter(adjacency[start]))]
+        index_of[start] = low[start] = counter[0]
+        counter[0] += 1
+        stack.append(start)
+        on_stack.add(start)
+        while work:
+            node, it = work[-1]
+            advanced = False
+            for nxt in it:
+                if nxt not in index_of:
+                    index_of[nxt] = low[nxt] = counter[0]
+                    counter[0] += 1
+                    stack.append(nxt)
+                    on_stack.add(nxt)
+                    work.append((nxt, iter(adjacency[nxt])))
+                    advanced = True
+                    break
+                if nxt in on_stack:
+                    low[node] = min(low[node], index_of[nxt])
+            if advanced:
+                continue
+            work.pop()
+            if work:
+                parent = work[-1][0]
+                low[parent] = min(low[parent], low[node])
+            if low[node] == index_of[node]:
+                component = []
+                while True:
+                    item = stack.pop()
+                    on_stack.discard(item)
+                    component.append(item)
+                    if item == node:
+                        break
+                if len(component) > 1 or node in self_loops:
+                    result.append(sorted(component, key=str))
+
+    for node in node_list:
+        if node not in index_of:
+            strongconnect(node)
+    return result
+
+
+def reachable_upstream(targets: Iterable[Hashable], edges: Iterable[tuple[Hashable, Hashable]]) -> set:
+    predecessors: dict = defaultdict(list)
+    for source, target in edges:
+        predecessors[target].append(source)
+    seen: set = set()
+    pending = list(targets)
+    while pending:
+        node = pending.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        pending.extend(predecessors[node])
+    return seen
+
+
+def branch_points(edges: Iterable[tuple[Hashable, Hashable]]) -> dict:
+    """Nodes whose outputs feed more than one downstream node."""
+    fanout: dict = defaultdict(set)
+    for source, target in edges:
+        fanout[source].add(target)
+    return {node: sorted(targets, key=str) for node, targets in fanout.items() if len(targets) > 1}
 
 
 @dataclass
-class GraphAnalysis:
-    """Topological order plus the structural facts the report needs."""
-
+class TreeAnalysis:
+    tree: str
     order: list[str] = field(default_factory=list)
     cycles: list[list[str]] = field(default_factory=list)
     dead_nodes: list[str] = field(default_factory=list)
-    muted_nodes: list[str] = field(default_factory=list)
-    branches: list[str] = field(default_factory=list)
-    roots: list[str] = field(default_factory=list)
-    sinks: list[str] = field(default_factory=list)
-    errors: list[str] = field(default_factory=list)
+    branches: dict[str, list[str]] = field(default_factory=dict)
+    output_nodes: list[str] = field(default_factory=list)
+    depth: dict[str, int] = field(default_factory=dict)
+
+    def as_dict(self) -> dict:
+        return {
+            "tree": self.tree,
+            "order": self.order,
+            "cycles": self.cycles,
+            "dead_nodes": self.dead_nodes,
+            "branches": self.branches,
+            "output_nodes": self.output_nodes,
+        }
 
 
-def analyze(tree: NodeTree) -> GraphAnalysis:
-    """Build the dependency graph and report cycles, branches, and dead nodes."""
+def node_edges(tree: NodeTree) -> list[tuple[str, str]]:
+    return [(e.from_node, e.to_node) for e in tree.edges if e.valid and not e.muted and e.from_node in tree.nodes and e.to_node in tree.nodes]
 
-    analysis = GraphAnalysis()
-    ids = [node.id for node in tree.nodes]
-    known = set(ids)
-    incoming: dict[str, set[str]] = {node_id: set() for node_id in ids}
-    outgoing: dict[str, set[str]] = {node_id: set() for node_id in ids}
 
-    for edge in tree.edges:
-        if edge.from_node not in known or edge.to_node not in known:
-            analysis.errors.append(
-                f"Link {edge.id} references a missing node ({edge.from_node} -> {edge.to_node})."
-            )
+def output_nodes(tree: NodeTree) -> list[str]:
+    types = OUTPUT_NODE_TYPES.get(tree.kind, set())
+    result = []
+    for node in tree.nodes.values():
+        if node.type not in types:
             continue
-        if edge.from_node == edge.to_node:
-            analysis.cycles.append([edge.from_node])
-        incoming[edge.to_node].add(edge.from_node)
-        outgoing[edge.from_node].add(edge.to_node)
-
-    indegree = {node_id: len(incoming[node_id]) for node_id in ids}
-    queue = [node_id for node_id in ids if indegree[node_id] == 0]
-    order: list[str] = []
-    while queue:
-        node_id = queue.pop(0)
-        order.append(node_id)
-        for child in sorted(outgoing[node_id]):
-            indegree[child] -= 1
-            if indegree[child] == 0:
-                queue.append(child)
-    analysis.order = order
-
-    cyclic_ids = [node_id for node_id in ids if node_id not in set(order)]
-    if cyclic_ids:
-        analysis.cycles.extend(_cycle_paths(cyclic_ids, outgoing))
-        analysis.errors.append(
-            "Cycle detected: " + ", ".join(cyclic_ids) + ". Generation keeps the acyclic prefix."
-        )
-
-    outputs = [node.id for node in tree.nodes if node.node_type in _OUTPUTS]
-    if not outputs:
-        outputs = [node_id for node_id in ids if not outgoing[node_id]]
-
-    reachable: set[str] = set()
-    stack = list(outputs)
-    while stack:
-        current = stack.pop()
-        if current in reachable or current not in known:
+        if node.parameters.get("is_active_output") is False and node.type != "CompositorNodeViewer":
             continue
-        reachable.add(current)
-        stack.extend(incoming[current])
-
-    for node in tree.nodes:
-        if node.mute:
-            analysis.muted_nodes.append(node.id)
-        if node.node_type in _STRUCTURAL:
-            continue
-        if node.id not in reachable and node.id not in cyclic_ids:
-            analysis.dead_nodes.append(node.id)
-
-    analysis.branches = [node_id for node_id in ids if len(outgoing[node_id]) > 1]
-    analysis.roots = [node_id for node_id in ids if not incoming[node_id]]
-    analysis.sinks = [node_id for node_id in ids if not outgoing[node_id]]
-    return analysis
+        result.append(node.id)
+    return result
 
 
-def _cycle_paths(cyclic_ids: list[str], outgoing: dict[str, set[str]]) -> list[list[str]]:
-    cyclic = set(cyclic_ids)
-    paths: list[list[str]] = []
-    seen: set[str] = set()
-    for start in cyclic_ids:
-        if start in seen:
-            continue
-        path = [start]
-        cursor = start
-        while True:
-            nxt = next((item for item in outgoing[cursor] if item in cyclic), None)
-            if nxt is None or nxt in path:
-                if nxt is not None:
-                    path.append(nxt)
-                break
-            path.append(nxt)
-            cursor = nxt
-        for item in path:
-            seen.add(item)
-        paths.append(path)
-    return paths
+def analyze_tree(tree: NodeTree) -> TreeAnalysis:
+    edges = node_edges(tree)
+    ids = [n for n in tree.nodes if tree.nodes[n].type not in IGNORED_NODE_TYPES]
+    order, cyclic = topological_sort(ids, edges)
+    outputs = output_nodes(tree)
+    live = reachable_upstream(outputs, edges)
+    dead = [n for n in ids if n not in live]
+    depth: dict[str, int] = {}
+    for node in order:
+        preds = [s for s, t in edges if t == node]
+        depth[node] = 1 + max((depth.get(p, 0) for p in preds), default=0)
+    return TreeAnalysis(
+        tree=tree.name,
+        order=order,
+        cycles=find_cycles(ids, edges) if cyclic else [],
+        dead_nodes=dead,
+        branches=branch_points(edges),
+        output_nodes=outputs,
+        depth=depth,
+    )
+
+
+def extract_subgraph(tree: NodeTree, roots: Iterable[str]) -> NodeTree:
+    """The upstream closure of ``roots`` as a standalone tree."""
+    keep = reachable_upstream(roots, node_edges(tree))
+    sub = NodeTree(name=f"{tree.name}::subgraph", kind=tree.kind, interface=list(tree.interface), is_group=tree.is_group, metadata=dict(tree.metadata))
+    for node_id, node in tree.nodes.items():
+        if node_id in keep:
+            sub.add(node)
+    sub.edges = [e for e in tree.edges if e.from_node in keep and e.to_node in keep]
+    return sub

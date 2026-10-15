@@ -1,150 +1,166 @@
-"""JSON serialization for graph IR and semantic IR.
+"""JSON serialization of Graph IR and Semantic IR documents.
 
-The format is data. Loading it does not execute Python, VEX, or Unreal
-scripts. Code generation is a separate, explicit step.
+Loading a document never executes code. Generated scripts are separate
+artifacts produced explicitly by a backend.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import fields, is_dataclass
-from enum import Enum
 from typing import Any
 
-from nodebridge.ir.graph import (
-    GraphEdge,
-    GraphNode,
-    GraphSocket,
-    GraphSystem,
-    InterfaceSocket,
-    NodeParameter,
-    NodeTree,
-    SocketDirection,
-)
-from nodebridge.ir.semantic import (
-    ExposedParameter,
-    Operation,
-    OperationKind,
-    Port,
-    SemanticEdge,
-    SemanticGraph,
-    SourceRef,
-)
-from nodebridge.ir.types import DataType
+from .. import __version__
+from ..common.units import ValueRole
+from .graph import GraphDocument, NodeTree, TreeKind
+from .semantic import Const, ExposedParameter, GraphOutput, InputValue, Link, Param, SemanticGraph, SemanticOp, SourceRef
+from .types import DataType, TypeRef
 
-IR_VERSION = "1.0"
-
-_CLASSES = {
-    "NodeTree": NodeTree,
-    "GraphNode": GraphNode,
-    "GraphSocket": GraphSocket,
-    "GraphEdge": GraphEdge,
-    "NodeParameter": NodeParameter,
-    "InterfaceSocket": InterfaceSocket,
-    "SemanticGraph": SemanticGraph,
-    "Operation": Operation,
-    "SemanticEdge": SemanticEdge,
-    "Port": Port,
-    "SourceRef": SourceRef,
-    "ExposedParameter": ExposedParameter,
-}
-
-_ENUMS = {
-    "GraphSystem": GraphSystem,
-    "SocketDirection": SocketDirection,
-    "DataType": DataType,
-    "OperationKind": OperationKind,
-}
+FORMAT_VERSION = 1
 
 
-def dumps(value: Any, *, indent: int = 2) -> str:
-    """Serialize a NodeBridge value to a JSON string."""
-
-    return json.dumps(to_plain(value), indent=indent, sort_keys=True)
-
-
-def loads(text: str) -> Any:
-    """Deserialize JSON produced by :func:`dumps`."""
-
-    return from_plain(json.loads(text))
-
-
-def dump(value: Any, path: str) -> None:
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(dumps(value))
-        handle.write("\n")
+def graph_document_to_dict(document: GraphDocument) -> dict:
+    return {
+        "format": "nodebridge.graph",
+        "format_version": FORMAT_VERSION,
+        "nodebridge_version": __version__,
+        "root": document.root,
+        "source": document.source,
+        "trees": [tree.as_dict() for tree in document.trees.values()],
+    }
 
 
-def load(path: str) -> Any:
-    with open(path, encoding="utf-8") as handle:
-        return loads(handle.read())
+def graph_document_from_dict(data: dict) -> GraphDocument:
+    if data.get("format") != "nodebridge.graph":
+        raise ValueError("not a NodeBridge Graph IR document")
+    trees = {tree["name"]: NodeTree.from_dict(tree) for tree in data.get("trees", [])}
+    return GraphDocument(root=data["root"], trees=trees, source=dict(data.get("source", {})))
 
 
-def to_plain(value: Any) -> Any:
-    if is_dataclass(value) and not isinstance(value, type):
-        payload: dict[str, Any] = {"__type__": type(value).__name__}
-        if isinstance(value, (NodeTree, SemanticGraph)):
-            payload["ir_version"] = IR_VERSION
-        for item in fields(value):
-            payload[item.name] = to_plain(getattr(value, item.name))
-        return payload
-    if isinstance(value, Enum):
+def dumps_graph(document: GraphDocument) -> str:
+    return json.dumps(graph_document_to_dict(document), indent=2, sort_keys=False, default=_default) + "\n"
+
+
+def loads_graph(text: str) -> GraphDocument:
+    return graph_document_from_dict(json.loads(text))
+
+
+# --- semantic ------------------------------------------------------------
+def _value_to_json(value: InputValue) -> Any:
+    if isinstance(value, Const):
+        return {"const": value.value, "type": value.type.value}
+    if isinstance(value, Param):
+        return {"param": value.name}
+    if isinstance(value, Link):
+        return {"link": [value.op, value.output]}
+    if isinstance(value, tuple):
+        return {"multi": [_value_to_json(item) for item in value]}
+    raise TypeError(f"unknown input value {value!r}")
+
+
+def _value_from_json(data: Any) -> InputValue:
+    if "const" in data:
+        return Const(data["const"], DataType(data.get("type", "any")))
+    if "param" in data:
+        return Param(data["param"])
+    if "link" in data:
+        return Link(data["link"][0], data["link"][1])
+    if "multi" in data:
+        return tuple(_value_from_json(item) for item in data["multi"])
+    raise ValueError(f"unknown input value {data!r}")
+
+
+def semantic_to_dict(graph: SemanticGraph) -> dict:
+    return {
+        "format": "nodebridge.semantic",
+        "format_version": FORMAT_VERSION,
+        "name": graph.name,
+        "kind": graph.kind.value,
+        "is_subgraph": graph.is_subgraph,
+        "source": graph.source,
+        "parameters": [
+            {
+                "key": p.key,
+                "name": p.name,
+                "type": p.data_type.value,
+                "role": p.role.value,
+                "default": p.default,
+                "value": p.value,
+                "min": p.min_value,
+                "max": p.max_value,
+                "description": p.description,
+                "identifier": p.identifier,
+            }
+            for p in graph.parameters
+        ],
+        "operations": [
+            {
+                "id": op.id,
+                "kind": op.kind,
+                "name": op.name,
+                "inputs": {key: _value_to_json(value) for key, value in op.inputs.items()},
+                "params": op.params,
+                "outputs": {key: ref.as_dict() for key, ref in op.outputs.items()},
+                "source": op.source.as_dict(),
+                **({"annotations": op.annotations} if op.annotations else {}),
+            }
+            for op in graph.ops.values()
+        ],
+        "outputs": [{"name": o.name, "label": o.label, "value": _value_to_json(o.value), "type": o.data_type.value} for o in graph.outputs],
+        "subgraphs": [semantic_to_dict(sub) for sub in graph.subgraphs.values()],
+    }
+
+
+def semantic_from_dict(data: dict) -> SemanticGraph:
+    graph = SemanticGraph(name=data["name"], kind=TreeKind(data["kind"]), source=dict(data.get("source", {})), is_subgraph=data.get("is_subgraph", False))
+    for p in data.get("parameters", []):
+        graph.parameters.append(
+            ExposedParameter(
+                key=p["key"],
+                name=p["name"],
+                data_type=DataType(p["type"]),
+                role=ValueRole(p.get("role", "scalar")),
+                default=p.get("default"),
+                value=p.get("value"),
+                min_value=p.get("min"),
+                max_value=p.get("max"),
+                description=p.get("description", ""),
+                identifier=p.get("identifier", ""),
+            )
+        )
+    for item in data.get("operations", []):
+        source = item.get("source", {})
+        graph.add(
+            SemanticOp(
+                id=item["id"],
+                kind=item["kind"],
+                name=item.get("name", ""),
+                inputs={key: _value_from_json(value) for key, value in item.get("inputs", {}).items()},
+                params=dict(item.get("params", {})),
+                outputs={key: TypeRef.from_dict(ref) for key, ref in item.get("outputs", {}).items()},
+                source=SourceRef(source.get("tree", ""), source.get("nodes", []), source.get("types", []), source.get("names", [])),
+                annotations=dict(item.get("annotations", {})),
+            )
+        )
+    graph.outputs = [GraphOutput(o["name"], _value_from_json(o["value"]), DataType(o.get("type", "geometry")), o.get("label", "")) for o in data.get("outputs", [])]
+    for sub in data.get("subgraphs", []):
+        child = semantic_from_dict(sub)
+        graph.subgraphs[child.name] = child
+    return graph
+
+
+def dumps_semantic(graph: SemanticGraph) -> str:
+    return json.dumps(semantic_to_dict(graph), indent=2, default=_default) + "\n"
+
+
+def loads_semantic(text: str) -> SemanticGraph:
+    return semantic_from_dict(json.loads(text))
+
+
+def _default(value: Any) -> Any:
+    if isinstance(value, (set, frozenset)):
+        return sorted(value)
+    if hasattr(value, "value"):
         return value.value
-    if isinstance(value, dict):
-        return {str(key): to_plain(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [to_plain(item) for item in value]
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    raise TypeError(f"Cannot serialize {type(value).__name__}")
-
-
-def from_plain(value: Any) -> Any:
-    if isinstance(value, list):
-        return [from_plain(item) for item in value]
-    if isinstance(value, dict):
-        if "__type__" in value:
-            return _from_typed(value)
-        return {key: from_plain(item) for key, item in value.items()}
-    return value
-
-
-def _from_typed(payload: dict[str, Any]) -> Any:
-    name = payload["__type__"]
-    cls = _CLASSES.get(name)
-    if cls is None:
-        raise ValueError(f"Unknown IR type: {name}")
-    kwargs = {}
-    for item in fields(cls):
-        if item.name not in payload:
-            continue
-        kwargs[item.name] = _coerce_field(item.name, from_plain(payload[item.name]))
-    return cls(**kwargs)
-
-
-def _coerce_field(name: str, value: Any) -> Any:
-    if name in {"system"} and isinstance(value, str):
-        return GraphSystem(value)
-    if name in {"direction"} and isinstance(value, str):
-        return SocketDirection(value)
-    if name in {"data_type", "base"} and isinstance(value, str):
-        return DataType(value)
-    if name == "kind" and isinstance(value, str):
-        return OperationKind(value)
-    if name == "source" and isinstance(value, dict) and "__type__" not in value:
-        return SourceRef(
-            node_ids=tuple(value.get("node_ids", ())),
-            node_types=tuple(value.get("node_types", ())),
-            node_names=tuple(value.get("node_names", ())),
-        )
-    if name == "source" and isinstance(value, SourceRef):
-        return SourceRef(
-            node_ids=tuple(value.node_ids),
-            node_types=tuple(value.node_types),
-            node_names=tuple(value.node_names),
-        )
-    if name == "location" and isinstance(value, list):
-        return (float(value[0]), float(value[1])) if value else None
-    if name in {"node_ids", "node_types", "node_names"} and isinstance(value, list):
-        return tuple(value)
-    return value
+    if isinstance(value, tuple):
+        return list(value)
+    return str(value)

@@ -1,25 +1,27 @@
-"""Blender frontend: native node tree to graph IR to semantic IR."""
+"""The Blender :class:`SourceFrontend`."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from nodebridge.frontend.blender.lower import lower_tree
-from nodebridge.frontend.blender.parser import parse_blender_tree, system_for_tree_id
-from nodebridge.ir.graph import GraphSystem, NodeTree
-from nodebridge.ir.semantic import SemanticGraph
+from ...compiler.diagnostics import DiagnosticBag
+from ...ir.graph import GraphDocument
+from ...ir.semantic import SemanticGraph
+from ..base import SourceFrontend, register_frontend
+from .lifting import BlenderLifter
+from .parser import parse_document
 
 
-class BlenderFrontend:
-    """Read Geometry Nodes, shader nodes, and compositor nodes."""
-
+class BlenderFrontend(SourceFrontend):
     id = "blender"
+    display_name = "Blender"
+    coordinate_system = "blender"
 
-    def parse(self, source: Any, *, system: GraphSystem | None = None) -> NodeTree:
-        return parse_blender_tree(source, system=system)
+    def parse(self, source: Any, **options: Any) -> GraphDocument:
+        return parse_document(source, **options)
 
-    def lower(self, tree: NodeTree) -> SemanticGraph:
-        return lower_tree(tree)
+    def lift(self, document: GraphDocument, diagnostics: DiagnosticBag) -> SemanticGraph:
+        return BlenderLifter(document, diagnostics).lift()
 
-    def system_for(self, bl_idname: str | None) -> GraphSystem | None:
-        return system_for_tree_id(bl_idname)
+
+register_frontend(BlenderFrontend())

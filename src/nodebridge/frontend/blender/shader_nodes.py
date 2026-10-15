@@ -1,245 +1,221 @@
-"""Shader node lowering.
+"""Shader node lifters.
 
-Shader graphs reuse the geometry-node math and noise lowerers. Shading
-operations stay in the semantic IR as color and shader operations so a
-material backend can build a native material instead of a SOP network.
+Math, Vector Math, Mix, Map Range, Clamp, Color Ramp, Combine/Separate
+XYZ, Noise and Voronoi are shared with Geometry Nodes (see
+``geometry_nodes.py``). ``Value`` and ``RGB`` nodes with a custom label
+become exposed material parameters; unlabeled ones are constants.
 """
 
 from __future__ import annotations
 
-from nodebridge.frontend.blender.geometry_nodes import _map_range, _math, _noise, _vector_math
-from nodebridge.frontend.blender.lower import finish, number, vector
-from nodebridge.ir.graph import GraphNode, NodeTree
-from nodebridge.ir.operations import field_port, make_operation, value_port
-from nodebridge.ir.semantic import OperationKind
-from nodebridge.ir.types import DataType
+from ...common.names import python_identifier
+from ...common.units import ValueRole
+from ...ir.graph import GraphNode, TreeKind
+from ...ir.semantic import Const, ExposedParameter, Param
+from ...ir.types import DataType
+from .lifting import LiftContext, LiftError, lifts
+
+SH = (TreeKind.SHADER,)
 
 
-def register_all(register) -> None:
-    for node_type, function in LOWERERS.items():
-        register(node_type)(function)
+def _expose(ctx: LiftContext, node: GraphNode, data_type: DataType, value, role: ValueRole):
+    if not node.label:
+        return Const(value, data_type)
+    key = python_identifier(node.label, "parameter")
+    existing = {p.key for p in ctx.graph.parameters}
+    base, index = key, 1
+    while key in existing:
+        index += 1
+        key = f"{base}_{index}"
+    ctx.graph.parameters.append(ExposedParameter(key=key, name=node.label, data_type=data_type, role=role, default=value, identifier=node.id))
+    return Param(key)
 
 
-def _principled(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.SHADER_OPERATION,
-        name=node.label or node.name,
-        parameters={
-            "mode": "principled",
-            "base_color": vector(node, "Base Color", (0.8, 0.8, 0.8)),
-            "metallic": number(node, "Metallic", 0.0),
-            "roughness": number(node, "Roughness", 0.5),
-            "emission": vector(node, "Emission Color", (0.0, 0.0, 0.0)),
-            "emission_strength": number(node, "Emission Strength", 0.0),
-            "alpha": number(node, "Alpha", 1.0),
-            "ior": number(node, "IOR", 1.45),
-        },
-        inputs={
-            "base_color": field_port("base_color", DataType.COLOR),
-            "metallic": field_port("metallic", DataType.FLOAT),
-            "roughness": field_port("roughness", DataType.FLOAT),
-            "normal": field_port("normal", DataType.VECTOR3),
-            "emission": field_port("emission", DataType.COLOR),
-        },
-        outputs={"shader": value_port("shader", DataType.ANY)},
-    )
-    return finish(
+@lifts("ShaderNodeValue", kinds=SH)
+def _value(ctx: LiftContext, node: GraphNode) -> None:
+    value = node.outputs[0].default if node.outputs else 0.0
+    ctx.bind(node, "Value", _expose(ctx, node, DataType.FLOAT, value, ValueRole.SCALAR))
+
+
+@lifts("ShaderNodeRGB", kinds=SH)
+def _rgb(ctx: LiftContext, node: GraphNode) -> None:
+    value = node.outputs[0].default if node.outputs else [1.0, 1.0, 1.0, 1.0]
+    ctx.bind(node, "Color", _expose(ctx, node, DataType.COLOR, value, ValueRole.COLOR))
+
+
+@lifts("ShaderNodeOutputMaterial", kinds=SH)
+def _material_output(ctx: LiftContext, node: GraphNode) -> None:
+    if node.parameters.get("is_active_output") is False:
+        return
+    ctx.emit(
+        "MATERIAL_OUTPUT",
         node,
-        operation,
-        {
-            "Base Color": "base_color",
-            "Metallic": "metallic",
-            "Roughness": "roughness",
-            "Normal": "normal",
-            "Emission": "emission",
-            "Emission Color": "emission",
-            "Emission Strength": "emission_strength",
-            "Alpha": "alpha",
-            "IOR": "ior",
-        },
-        {"BSDF": "shader"},
+        {"surface": ctx.input(node, "Surface"), "displacement": ctx.input(node, "Displacement") if ctx.has_link(node, "Displacement") else None},
+        {"material": ctx.tree.metadata.get("material", ctx.tree.name), "target": ctx.prop(node, "target", "ALL")},
     )
+    if ctx.has_link(node, "Volume"):
+        ctx.warn("lift.volume", f"{node.display_name}: volume shading is not translated.", node)
 
 
-def _shader_output(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.SHADER_OPERATION,
-        name=node.label or node.name or "Material Output",
-        parameters={"mode": "material_output"},
-        inputs={"surface": value_port("surface", DataType.ANY), "volume": value_port("volume", DataType.ANY), "displacement": field_port("displacement", DataType.VECTOR3)},
-        outputs={},
-    )
-    return finish(node, operation, {"Surface": "surface", "Volume": "volume", "Displacement": "displacement"}, {})
-
-
-def _color(mode: str):
-    def lower(node: GraphNode, tree: NodeTree):
-        parameters = {
-            "mode": mode,
-            "blend": str(node.properties.get("blend_type", "MIX")).lower(),
-            "factor": number(node, "Factor", 0.5),
-            "color": vector(node, "Color", (1.0, 1.0, 1.0)),
-        }
-        if "color_ramp" in node.properties:
-            parameters["stops"] = node.properties["color_ramp"]
-        operation = make_operation(
-            id=node.id,
-            kind=OperationKind.COLOR_OPERATION,
-            name=node.label or node.name,
-            parameters=parameters,
-            inputs={
-                "color": field_port("color", DataType.COLOR),
-                "color_b": field_port("color_b", DataType.COLOR),
-                "factor": field_port("factor", DataType.FLOAT),
-            },
-            outputs={"color": field_port("color", DataType.COLOR)},
-        )
-        return finish(
-            node,
-            operation,
-            {"Fac": "factor", "Factor": "factor", "Color": "color", "Color1": "color", "Color2": "color_b", "A": "color", "B": "color_b"},
-            {"Color": "color", "Result": "color"},
-        )
-
-    return lower
-
-
-def _image(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.TEXTURE_SAMPLE,
-        name=node.label or node.name,
-        parameters={"image": node.properties.get("image", "")},
-        inputs={"vector": field_port("vector", DataType.VECTOR3)},
-        outputs={"color": field_port("color", DataType.COLOR), "alpha": field_port("alpha", DataType.FLOAT)},
-    )
-    return finish(node, operation, {"Vector": "vector"}, {"Color": "color", "Alpha": "alpha"})
-
-
-def _tex_coord(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.ATTRIBUTE_READ,
-        name=node.label or node.name,
-        parameters={"attribute": "uv", "data_type": DataType.VECTOR3.value},
-        outputs={
-            "uv": field_port("uv", DataType.VECTOR3),
-            "object": field_port("object", DataType.VECTOR3),
-            "generated": field_port("generated", DataType.VECTOR3),
-            "normal": field_port("normal", DataType.VECTOR3),
-        },
-    )
-    return finish(node, operation, {}, {"UV": "uv", "Object": "object", "Generated": "generated", "Normal": "normal"})
-
-
-def _normal_node(mode: str):
-    def lower(node: GraphNode, tree: NodeTree):
-        operation = make_operation(
-            id=node.id,
-            kind=OperationKind.SHADER_OPERATION,
-            name=node.label or node.name,
-            parameters={"mode": mode, "strength": number(node, "Strength", 1.0), "distance": number(node, "Distance", 0.1)},
-            inputs={"normal": field_port("normal", DataType.VECTOR3), "height": field_port("height", DataType.FLOAT), "color": field_port("color", DataType.COLOR)},
-            outputs={"normal": field_port("normal", DataType.VECTOR3)},
-        )
-        return finish(node, operation, {"Normal": "normal", "Height": "height", "Color": "color", "Strength": "strength"}, {"Normal": "normal"})
-
-    return lower
-
-
-def _value(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.FIELD,
-        name=node.label or node.name,
-        parameters={"value": number(node, "Value", 0.0) if node.output("Value") is None else _output_default(node), "data_type": "float"},
-        outputs={"value": field_port("value", DataType.FLOAT)},
-    )
-    return finish(node, operation, {}, {"Value": "value"})
-
-
-def _output_default(node: GraphNode) -> float:
-    socket = node.output("Value")
-    if socket is not None and isinstance(socket.default, (int, float)):
-        return float(socket.default)
-    return 0.0
-
-
-def _rgb(node: GraphNode, tree: NodeTree):
-    color = (1.0, 1.0, 1.0)
-    socket = node.output("Color")
-    if socket is not None and isinstance(socket.default, (list, tuple)):
-        values = list(socket.default) + [1.0, 1.0, 1.0]
-        color = (float(values[0]), float(values[1]), float(values[2]))
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.COLOR_OPERATION,
-        name=node.label or node.name,
-        parameters={"mode": "constant", "value": color, "color": color},
-        outputs={"color": field_port("color", DataType.COLOR)},
-    )
-    return finish(node, operation, {}, {"Color": "color"})
-
-
-def _emission(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.SHADER_OPERATION,
-        name=node.label or node.name,
-        parameters={"mode": "emission", "color": vector(node, "Color", (1.0, 1.0, 1.0)), "strength": number(node, "Strength", 1.0)},
-        inputs={"color": field_port("color", DataType.COLOR), "strength": field_port("strength", DataType.FLOAT)},
-        outputs={"shader": value_port("shader", DataType.ANY)},
-    )
-    return finish(node, operation, {"Color": "color", "Strength": "strength"}, {"Emission": "shader"})
-
-
-def _bsdf(mode: str):
-    def lower(node: GraphNode, tree: NodeTree):
-        operation = make_operation(
-            id=node.id,
-            kind=OperationKind.SHADER_OPERATION,
-            name=node.label or node.name,
-            parameters={"mode": mode, "color": vector(node, "Color", (0.8, 0.8, 0.8)), "roughness": number(node, "Roughness", 0.5)},
-            inputs={"color": field_port("color", DataType.COLOR), "roughness": field_port("roughness", DataType.FLOAT), "normal": field_port("normal", DataType.VECTOR3)},
-            outputs={"shader": value_port("shader", DataType.ANY)},
-        )
-        return finish(node, operation, {"Color": "color", "Roughness": "roughness", "Normal": "normal"}, {"BSDF": "shader"})
-
-    return lower
-
-
-LOWERERS = {
-    "ShaderNodeBsdfPrincipled": _principled,
-    "ShaderNodeOutputMaterial": _shader_output,
-    "ShaderNodeTexNoise": _noise("noise"),
-    "ShaderNodeTexVoronoi": _noise("voronoi"),
-    "ShaderNodeTexImage": _image,
-    "ShaderNodeTexChecker": _color("checker"),
-    "ShaderNodeMix": _color("mix"),
-    "ShaderNodeMixRGB": _color("mix"),
-    "ShaderNodeValToRGB": _color("ramp"),
-    "ShaderNodeBump": _normal_node("bump"),
-    "ShaderNodeNormalMap": _normal_node("normal_map"),
-    "ShaderNodeMath": _math,
-    "ShaderNodeVectorMath": _vector_math,
-    "ShaderNodeMapRange": _map_range,
-    "ShaderNodeRGB": _rgb,
-    "ShaderNodeValue": _value,
-    "ShaderNodeSeparateColor": _color("separate"),
-    "ShaderNodeCombineColor": _color("combine"),
-    "ShaderNodeMapping": _vector_math,
-    "ShaderNodeTexCoord": _tex_coord,
-    "ShaderNodeFresnel": _bsdf("fresnel"),
-    "ShaderNodeHueSaturation": _color("hue"),
-    "ShaderNodeBrightContrast": _color("brightness"),
-    "ShaderNodeInvert": _color("invert"),
-    "ShaderNodeEmission": _emission,
-    "ShaderNodeBsdfDiffuse": _bsdf("diffuse"),
-    "ShaderNodeBsdfGlossy": _bsdf("glossy"),
-    "NodeGroupInput": None,  # geometry module registers the shared group nodes
-    "NodeGroupOutput": None,
+_PRINCIPLED = {
+    "base_color": "Base Color",
+    "metallic": "Metallic",
+    "roughness": "Roughness",
+    "ior": "IOR",
+    "alpha": "Alpha",
+    "specular": "Specular IOR Level",
+    "emission_color": "Emission Color",
+    "emission_strength": "Emission Strength",
+    "transmission": "Transmission Weight",
+    "coat": "Coat Weight",
+    "coat_roughness": "Coat Roughness",
+    "sheen": "Sheen Weight",
+    "subsurface": "Subsurface Weight",
 }
 
-LOWERERS = {key: value for key, value in LOWERERS.items() if value is not None}
+
+@lifts("ShaderNodeBsdfPrincipled", kinds=SH)
+def _principled(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = {key: ctx.input(node, name) for key, name in _PRINCIPLED.items()}
+    if ctx.has_link(node, "Normal"):
+        inputs["normal"] = ctx.input(node, "Normal")
+    ctx.emit("SHADER_BSDF", node, inputs, {"model": "principled", "distribution": ctx.prop(node, "distribution", "MULTI_GGX")}, {"shader": "BSDF"})
+
+
+@lifts("ShaderNodeBsdfDiffuse", kinds=SH)
+def _diffuse(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = {"base_color": ctx.input(node, "Color"), "roughness": ctx.input(node, "Roughness")}
+    if ctx.has_link(node, "Normal"):
+        inputs["normal"] = ctx.input(node, "Normal")
+    ctx.emit("SHADER_BSDF", node, inputs, {"model": "diffuse"}, {"shader": "BSDF"})
+
+
+@lifts("ShaderNodeEmission", kinds=SH)
+def _emission(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("SHADER_BSDF", node, {"emission_color": ctx.input(node, "Color"), "emission_strength": ctx.input(node, "Strength")}, {"model": "emission"}, {"shader": "Emission"})
+
+
+@lifts("ShaderNodeMixShader", "ShaderNodeAddShader", kinds=SH)
+def _mix_shader(ctx: LiftContext, node: GraphNode) -> None:
+    shaders = [s for s in node.inputs if s.data_type == DataType.SHADER]
+    values = []
+    for socket in shaders:
+        edges = ctx.edges_into(node, socket.identifier)
+        values.append(ctx._resolve(edges[0]) if edges else None)
+    inputs = {"a": values[0] if values else None, "b": values[1] if len(values) > 1 else None}
+    if node.type == "ShaderNodeMixShader":
+        inputs["factor"] = ctx.input(node, "Fac")
+    ctx.emit("SHADER_MIX", node, inputs, {"mode": "MIX" if node.type == "ShaderNodeMixShader" else "ADD"}, {"shader": "Shader"})
+
+
+@lifts("ShaderNodeTexImage", kinds=SH)
+def _image(ctx: LiftContext, node: GraphNode) -> None:
+    image = ctx.prop(node, "image")
+    ctx.emit(
+        "TEXTURE_SAMPLE",
+        node,
+        {"vector": ctx.input(node, "Vector", implicit="uv"), "image": Const(image, DataType.IMAGE)},
+        {"interpolation": ctx.prop(node, "interpolation", "Linear"), "extension": ctx.prop(node, "extension", "REPEAT"), "projection": ctx.prop(node, "projection", "FLAT")},
+        {"color": "Color", "alpha": "Alpha"},
+    )
+
+
+_COORDS = {"Generated": "generated", "Normal": "normal", "UV": "uv", "Object": "object", "Camera": "camera", "Window": "window", "Reflection": "reflection"}
+
+
+@lifts("ShaderNodeTexCoord", kinds=SH)
+def _texcoord(ctx: LiftContext, node: GraphNode) -> None:
+    linked = {e.from_socket for e in ctx.tree.outgoing(node.id)}
+    for socket_name, field in _COORDS.items():
+        socket = node.find_output(socket_name)
+        if socket is not None and socket.identifier in linked:
+            ctx.emit("FIELD_INPUT", node, params={"field": field}, outputs={"value": socket_name}, output_types={"value": DataType.VECTOR3}, name=f"{node.display_name} {socket_name}")
+
+
+@lifts("ShaderNodeUVMap", kinds=SH)
+def _uvmap(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("FIELD_INPUT", node, params={"field": "uv", "uv_map": ctx.prop(node, "uv_map", "")}, outputs={"value": "UV"}, output_types={"value": DataType.VECTOR3})
+
+
+_GEOMETRY_FIELDS = {"Position": "world_position", "Normal": "normal", "Tangent": "tangent", "Incoming": "camera"}
+
+
+@lifts("ShaderNodeNewGeometry", kinds=SH)
+def _geometry(ctx: LiftContext, node: GraphNode) -> None:
+    linked = {e.from_socket for e in ctx.tree.outgoing(node.id)}
+    for socket_name, field in _GEOMETRY_FIELDS.items():
+        socket = node.find_output(socket_name)
+        if socket is not None and socket.identifier in linked:
+            ctx.emit("FIELD_INPUT", node, params={"field": field}, outputs={"value": socket_name}, output_types={"value": DataType.VECTOR3}, name=f"{node.display_name} {socket_name}")
+    for socket_name in ("Parametric", "Backfacing", "Pointiness", "Random Per Island", "True Normal"):
+        socket = node.find_output(socket_name)
+        if socket is not None and socket.identifier in linked:
+            raise LiftError(f"Geometry output {socket_name!r} is not translated.")
+
+
+@lifts("ShaderNodeMapping", kinds=SH)
+def _mapping(ctx: LiftContext, node: GraphNode) -> None:
+    vector_type = ctx.prop(node, "vector_type", "POINT")
+    inputs = {"vector": ctx.input(node, "Vector", implicit="generated"), "scale": ctx.input(node, "Scale")}
+    if vector_type in ("POINT", "TEXTURE"):
+        inputs["location"] = ctx.input(node, "Location")
+    inputs["rotation"] = ctx.input(node, "Rotation")
+    ctx.emit("MAPPING", node, inputs, {"vector_type": vector_type}, {"vector": "Vector"})
+
+
+@lifts("ShaderNodeBump", kinds=SH)
+def _bump(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = {"strength": ctx.input(node, "Strength"), "distance": ctx.input(node, "Distance"), "height": ctx.input(node, "Height")}
+    if ctx.has_link(node, "Normal"):
+        inputs["normal"] = ctx.input(node, "Normal")
+    ctx.emit("BUMP", node, inputs, {"invert": bool(ctx.prop(node, "invert", False))}, {"normal": "Normal"})
+
+
+@lifts("ShaderNodeNormalMap", kinds=SH)
+def _normal_map(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("NORMAL_MAP", node, {"strength": ctx.input(node, "Strength"), "color": ctx.input(node, "Color")}, {"space": ctx.prop(node, "space", "TANGENT")}, {"normal": "Normal"})
+
+
+_COLOR_OPS = {
+    "ShaderNodeInvert": ("invert", {"factor": "Fac", "color": "Color"}),
+    "ShaderNodeHueSaturation": ("hue_saturation", {"a": "Hue", "b": "Saturation", "c": "Value", "factor": "Fac", "color": "Color"}),
+    "ShaderNodeGamma": ("gamma", {"color": "Color", "a": "Gamma"}),
+    "ShaderNodeBrightContrast": ("bright_contrast", {"color": "Color", "a": "Bright", "b": "Contrast"}),
+    "ShaderNodeRGBToBW": ("rgb_to_bw", {"color": "Color"}),
+}
+
+
+@lifts(*_COLOR_OPS, kinds=SH)
+def _color_op(ctx: LiftContext, node: GraphNode) -> None:
+    operation, sockets = _COLOR_OPS[node.type]
+    outputs = {"value": "Val"} if operation == "rgb_to_bw" else {"color": "Color"}
+    ctx.emit("COLOR_OPERATION", node, {k: ctx.input(node, n) for k, n in sockets.items()}, {"operation": operation}, outputs)
+
+
+@lifts("ShaderNodeSeparateColor", kinds=SH)
+def _separate_color(ctx: LiftContext, node: GraphNode) -> None:
+    if ctx.prop(node, "mode", "RGB") != "RGB":
+        raise LiftError("Separate Color is lifted only in RGB mode.")
+    ctx.emit("COLOR_OPERATION", node, {"color": ctx.input(node, "Color")}, {"operation": "separate_rgb"}, {"r": "Red", "g": "Green", "b": "Blue"})
+
+
+@lifts("ShaderNodeCombineColor", kinds=SH)
+def _combine_color(ctx: LiftContext, node: GraphNode) -> None:
+    if ctx.prop(node, "mode", "RGB") != "RGB":
+        raise LiftError("Combine Color is lifted only in RGB mode.")
+    ctx.emit("COLOR_OPERATION", node, {"a": ctx.input(node, "Red"), "b": ctx.input(node, "Green"), "c": ctx.input(node, "Blue")}, {"operation": "combine_rgb"}, {"color": "Color"})
+
+
+_PROCEDURAL = {"ShaderNodeTexGradient": "gradient", "ShaderNodeTexChecker": "checker", "ShaderNodeTexWave": "wave"}
+
+
+@lifts(*_PROCEDURAL, kinds=SH)
+def _procedural(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = {"vector": ctx.input(node, "Vector", implicit="generated")}
+    if node.find_input("Scale") is not None:
+        inputs["scale"] = ctx.input(node, "Scale")
+    params = {"texture": _PROCEDURAL[node.type]}
+    for key in ("gradient_type", "wave_type", "bands_direction", "wave_profile"):
+        if key in node.parameters:
+            params[key] = node.parameters[key]
+    ctx.emit("PROCEDURAL_TEXTURE", node, inputs, params, {"fac": "Fac", "color": "Color"})

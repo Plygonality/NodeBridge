@@ -1,0 +1,101 @@
+NodeBridge Translation Report
+=============================
+
+Source:
+    Geometry Nodes / BuildingGenerator  (Blender 4.2.23 LTS)
+Target:
+    Unreal Engine 5 (PCG graph)
+
+27 source nodes
+23 semantic operations
+
+✓ EXACT:        4
+≈ EQUIVALENT:   3
+~ APPROXIMATE:  5
+✕ UNSUPPORTED:  11
+
+Operations:
+  ✕ UNSUPPORTED Normal             FIELD_INPUT          -> none
+  ~ APPROXIMATE Window Panel       PRIMITIVE            -> Engine basic shape
+  ✕ UNSUPPORTED Footprint          PRIMITIVE            -> none
+  ✓ EXACT       Building Height    MATH                 -> Python expression
+  ✓ EXACT       Floor Offset       COMBINE_VECTOR       -> Python expression
+  ✓ EXACT       Slab Width         MATH                 -> Python expression
+  ✓ EXACT       Slab Depth         MATH                 -> Python expression
+  ✕ UNSUPPORTED Separate XYZ       SEPARATE_VECTOR      -> none
+  ✕ UNSUPPORTED Building Mass      EXTRUDE              -> none
+  ✕ UNSUPPORTED Floor Levels       PRIMITIVE            -> none
+  ✕ UNSUPPORTED Slab Outline       PRIMITIVE            -> none
+  ✕ UNSUPPORTED Facade Facing      MATH                 -> none
+  ✕ UNSUPPORTED Slab Thickness     EXTRUDE              -> none
+  ✕ UNSUPPORTED Is Wall            COMPARE              -> none
+  ✕ UNSUPPORTED Stack Floors       INSTANCE             -> none
+  ~ APPROXIMATE Window Positions   SCATTER              -> PCGSurfaceSamplerSettings
+  ~ APPROXIMATE Realize Floors     REALIZE_INSTANCES    -> none (pass-through)
+  ≈ EQUIVALENT  Window Variation   RANDOM_TRANSFORM     -> PCGTransformPointsSettings
+  ~ APPROXIMATE Place Windows      INSTANCE             -> PCGStaticMeshSpawnerSettings
+  ~ APPROXIMATE Realize Windows    REALIZE_INSTANCES    -> none (pass-through)
+  ≈ EQUIVALENT  Assemble Building  MERGE                -> PCGMergeSettings
+  ✕ UNSUPPORTED Concrete           MATERIAL_ASSIGNMENT  -> none
+  ≈ EQUIVALENT  Geometry           GEOMETRY_OUTPUT      -> PCG graph Output node
+
+Unsupported:
+  Normal (GeometryNodeInputNormal)
+    Reason: Per-element field expressions cannot be built with PCG's Python API; only recognized patterns (random ranges, noise masks) are translated.
+  Footprint (GeometryNodeMeshGrid)
+    Reason: PCG does not generate meshes; primitives are only translated as instance meshes.
+  Separate XYZ (ShaderNodeSeparateXYZ)
+    Reason: Per-element field expressions cannot be built with PCG's Python API; only recognized patterns (random ranges, noise masks) are translated.
+  Building Mass (GeometryNodeExtrudeMesh)
+    Reason: PCG works on point data; this modelling operation has no PCG node (a Geometry Script backend could cover it later).
+  Floor Levels (GeometryNodeMeshLine)
+    Reason: PCG does not generate meshes; primitives are only translated as instance meshes.
+  Slab Outline (GeometryNodeMeshGrid)
+    Reason: PCG does not generate meshes; primitives are only translated as instance meshes.
+  Facade Facing (ShaderNodeMath)
+    Reason: Per-element field expressions cannot be built with PCG's Python API; only recognized patterns (random ranges, noise masks) are translated.
+  Slab Thickness (GeometryNodeExtrudeMesh)
+    Reason: PCG works on point data; this modelling operation has no PCG node (a Geometry Script backend could cover it later).
+  Is Wall (FunctionNodeCompare)
+    Reason: Per-element field expressions cannot be built with PCG's Python API; only recognized patterns (random ranges, noise masks) are translated.
+  Stack Floors (GeometryNodeInstanceOnPoints)
+    Reason: The instanced geometry is procedural; PCG spawns Static Mesh assets.
+    Fallback: Convert the instance geometry to a Static Mesh asset and assign it on the spawner.
+  Concrete (GeometryNodeSetMaterial)
+    Reason: Materials are only translated on spawned meshes.
+
+Approximations:
+  Window Panel (GeometryNodeMeshCube)
+    Reason: The cube becomes /Engine/BasicShapes/Cube.Cube scaled to size.
+    - Mesh resolution and UVs differ.
+  Window Positions (GeometryNodeDistributePointsOnFaces)
+    Reason: Distribute Points on Faces becomes a Surface Sampler with the same density per square meter.
+    - Sample positions differ (different generators).
+    - PCG samples the PCG component's actor surface; the Blender geometry feeding this scatter is not rebuilt.
+    - The face selection is not translated; the whole surface is sampled.
+  Realize Floors (GeometryNodeRealizeInstances)
+    Reason: PCG spawns instanced static mesh components; there is no 'realize' step.
+    - Spawned meshes stay instances.
+  Place Windows (GeometryNodeInstanceOnPoints)
+    Reason: Instance on Points becomes a Static Mesh Spawner; mesh primitives map to /Engine/BasicShapes meshes scaled to size.
+    - Geometry Nodes instances arbitrary geometry; PCG spawns Static Mesh assets.
+  Realize Windows (GeometryNodeRealizeInstances)
+    Reason: PCG spawns instanced static mesh components; there is no 'realize' step.
+    - Spawned meshes stay instances.
+
+Equivalent (intent preserved, details differ):
+  Window Variation (FunctionNodeRandomValue, GeometryNodeInstanceOnPoints)
+    Reason: Random rotation / scale ranges become Transform Points min/max ranges.
+    - PCG's random stream differs from Blender's; ranges are preserved.
+    - Euler ranges are mapped per axis to roll / pitch / yaw.
+  Assemble Building (GeometryNodeJoinGeometry)
+    Reason: Join Geometry becomes Merge Points.
+    - Mesh geometry inputs are not merged; only point data and spawned results flow on.
+  Geometry (NodeGroupOutput)
+    Reason: Final point data / spawned meshes.
+
+Compiler notes:
+  - Node group 'FloorSlab' (Floor Slab) was inlined: PCG subgraph / material function assets are not generated yet.
+  - Recognized random per-instance scale/rotation as RandomTransform (Place Windows)
+
+NodeBridge reproduces procedural intent. Unless an operation is EXACT, expect a semantically equivalent system, not vertex- or pixel-identical output.

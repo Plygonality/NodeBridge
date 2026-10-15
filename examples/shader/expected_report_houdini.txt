@@ -1,0 +1,46 @@
+NodeBridge Translation Report
+=============================
+
+Source:
+    Shader / ProceduralRock  (Blender 4.2.23 LTS)
+Target:
+    Houdini (MaterialX material in /mat)
+
+9 source nodes
+8 semantic operations
+
+✓ EXACT:        4
+≈ EQUIVALENT:   3
+~ APPROXIMATE:  1
+✕ UNSUPPORTED:  0
+
+Operations:
+  ≈ EQUIVALENT  Texture Coordinate Object  FIELD_INPUT          -> mtlxposition / mtlxnormal / mtlxtexcoord
+  ✓ EXACT       Mapping                    MAPPING              -> mtlxmultiply + mtlxadd
+  ~ APPROXIMATE Rock Noise                 NOISE                -> mtlxfractal3d
+  ✓ EXACT       Rock Colors                COLOR_RAMP           -> mtlxremap + mtlxclamp + mtlxmix chain
+  ✓ EXACT       Roughness Range            MAP_RANGE            -> mtlxremap (+ mtlxclamp)
+  ≈ EQUIVALENT  Rock Bump                  BUMP                 -> mtlxheighttonormal
+  ≈ EQUIVALENT  Principled BSDF            SHADER_BSDF          -> mtlxstandard_surface
+  ✓ EXACT       Material Output            MATERIAL_OUTPUT      -> material path /mat/<name>
+
+Approximations:
+  Rock Noise (ShaderNodeTexNoise)
+    Reason: Blender fBm noise approximated with MaterialX fractal noise remapped to 0..1.
+    - Pattern will not be numerically identical.
+    - Color output reuses the scalar noise.
+
+Equivalent (intent preserved, details differ):
+  Texture Coordinate Object (ShaderNodeTexCoord)
+    Reason: Texture coordinates map onto MaterialX geometric inputs.
+    - Blender's Generated coordinates are bounding-box normalized; MaterialX object position is not.
+    - Axes follow Houdini's Y-up convention.
+  Rock Bump (ShaderNodeBump)
+    Reason: Height-driven normal perturbation.
+    - Bump distance is folded into the scale.
+  Principled BSDF (ShaderNodeBsdfPrincipled)
+    Reason: Principled BSDF maps onto Autodesk Standard Surface; both are physically based but not identical models.
+    - Specular IOR Level is mapped to specular weight (x2).
+    - Alpha is mapped to opacity.
+
+NodeBridge reproduces procedural intent. Unless an operation is EXACT, expect a semantically equivalent system, not vertex- or pixel-identical output.

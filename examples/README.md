@@ -1,18 +1,16 @@
 # Examples
 
-These graphs are duck-typed Blender trees. `graph.json` is graph IR. The `.py` files are the scripts NodeBridge generates. The `.txt` files are the translation reports.
-
-| Example | Source | What it exercises |
-| --- | --- | --- |
-| `scatter` | Geometry Nodes | Surface input, density, scatter, cube instance, random scale and rotation, realize |
-| `building` | Geometry Nodes | Grid, extrude, subdivide, scatter, facade instance, join, exposed Height and Density |
-| `shader` | Shader nodes | Texture coordinate, noise, color ramp, roughness map range, bump, Principled BSDF |
-| `compositor` | Compositor | Render layer, glare, color correction, ellipse vignette, mix, composite |
-
-Regenerate them from the repository root:
+The four example systems are built in Blender by [`blender/build_examples.py`](blender/build_examples.py). Run it from Blender's Text Editor with **Run Script**, or headless:
 
 ```bash
-python3 -c "from scripts.generate_examples import main; main()"
+blender --background --factory-startup --python examples/blender/build_examples.py -- --save examples.blend
 ```
 
-The generator writes the same files the tests compile. It does not run Houdini or Unreal.
+| Folder | Blender system | Files |
+| --- | --- | --- |
+| [`scatter/`](scatter/) | **ScatterRocks** on the *Ground* object: Distribute Points on Faces → Delete Geometry by a noise coverage mask → Instance on Points (an ico sphere with a material) with random scale → Rotate Instances with a random yaw → Realize → Join | `scatter.graph.json` (Graph IR exported from Blender 4.2), `expected_report_*.txt`, `generated_*.py` |
+| [`building/`](building/) | **BuildingGenerator** on the *Building* object: grid footprint → extruded mass (Floors × Floor Height); floor slabs from the nested **FloorSlab** group stacked on a Mesh Line; windows distributed on walls (Normal.z ≈ 0) with random scale | same |
+| [`shader/`](shader/) | **ProceduralRock** material: Object coordinates → Mapping → Noise → 3-stop Color Ramp (base color), Map Range with a labeled *Roughness Scale* Value (roughness), Bump (normal) | same |
+| [`compositor/`](compositor/) | Scene compositor: Render Layers → Glare (fog glow) → Color Balance → Multiply with a blurred Ellipse Mask (vignette) → Composite | same |
+
+`generated_houdini.py` and `generated_unreal.py` are exactly what the add-on's **Generate Code** button produces for these trees. The tests compare against them. Regenerate them with `python tools/regenerate_examples.py`.

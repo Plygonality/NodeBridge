@@ -1,174 +1,265 @@
-"""Houdini backend.
-
-Geometry graphs become SOP networks. Shader graphs become material builders.
-Compositor graphs become COP2 networks where a node type exists, and labeled
-nulls where it does not.
-"""
+"""Houdini backend: Semantic IR -> executable Houdini Python (``hou``)."""
 
 from __future__ import annotations
 
-from nodebridge.backend.houdini.generators import render_network
-from nodebridge.backend.houdini.mappings import load
-from nodebridge.backend.houdini.sop import HoudiniBuild, SpareParm
-from nodebridge.ir.semantic import OperationKind, SemanticGraph
-from nodebridge.ir.types import DataType
-from nodebridge.translation.confidence import Classification, Confidence, TranslationRecord
-from nodebridge.translation.registry import REGISTRY
+import math
+from typing import TYPE_CHECKING, Any
+
+from ... import __version__
+from ...common.coordinates import HOUDINI, convert_point, convert_scale
+from ...common.names import NameAllocator, houdini_node_name, python_identifier
+from ...common.units import ValueRole
+from ...compiler.diagnostics import DiagnosticBag
+from ...compiler.subgraphs import has_field_interface, inline_where
+from ...ir.graph import TreeKind
+from ...ir.semantic import Const, ExposedParameter, SemanticGraph, SemanticOp
+from ...ir.types import GEOMETRY_TYPES, DataType
+from ..base import GeneratedCode, TargetBackend
+from ..codegen import PyWriter, clean_number, literal
+from ..registry import register_backend
+from .hscript import spare_parm_name
+from .runtime import HELPERS
+from .sop import Network, SopBuilder
+from .vex import library_definitions
+
+if TYPE_CHECKING:
+    from ...compiler.pipeline import CompilationResult
 
 
-class HoudiniBackend:
-    """Generate pasteable Houdini Python from a semantic graph."""
-
+class HoudiniBackend(TargetBackend):
     id = "houdini"
+    display_name = "Houdini"
+    language_label = "Houdini Python"
+    coordinate_system = "houdini"
+    required_imports = ("hou",)
+    contexts = {TreeKind.GEOMETRY: "sop", TreeKind.SHADER: "mtlx", TreeKind.COMPOSITOR: "cop2"}
+    context_labels = {"sop": "SOP network", "mtlx": "MaterialX material in /mat", "cop2": "COP2 network in /img"}
 
-    def supports(self, operation: OperationKind) -> bool:
-        load()
-        spec = REGISTRY.get(operation, self.id)
-        return spec is not None and spec.confidence is not Confidence.UNSUPPORTED
-
-    def classify(self, operation: OperationKind) -> Classification:
-        load()
-        spec = REGISTRY.get(operation, self.id)
-        if spec is None:
-            return Classification(
-                confidence=Confidence.UNSUPPORTED,
-                explanation=f"No Houdini translator is registered for {operation.value}.",
-                implementation="none",
-                emitted=True,
+    def prepare(self, graph: SemanticGraph, diagnostics: DiagnosticBag) -> SemanticGraph:
+        if graph.kind == TreeKind.GEOMETRY:
+            inline_where(
+                graph,
+                lambda g, op: has_field_interface(g, op) or not any(ref.base in GEOMETRY_TYPES for ref in op.outputs.values()),
+                diagnostics,
+                "SOP subnets cannot pass fields across their boundary",
             )
-        return spec.classification()
-
-    def generate(self, graph: SemanticGraph, options) -> tuple[str, list[TranslationRecord]]:
-        load()
-        if graph.system.value == "shader":
-            from nodebridge.backend.houdini.mappings.shading import generate_material
-
-            return generate_material(graph, options)
-        if graph.system.value == "compositor":
-            from nodebridge.backend.houdini.mappings.compositor import generate_cop
-
-            return generate_cop(graph, options)
-        build = HoudiniBuild(graph, options)
-        populate(build)
-        _promote(build)
-        records = collect_records(build, graph)
-        return render_network(build), records
-
-
-def populate(build: HoudiniBuild) -> None:
-    """Run translators in dependency order."""
-
-    load()
-    for operation in _ordered(build.graph):
-        spec = REGISTRY.get(operation.kind, "houdini")
-        if spec is None or spec.function is None:
-            build.classifications[operation.id] = Classification(
-                confidence=Confidence.UNSUPPORTED,
-                explanation=f"No Houdini translator is registered for {operation.kind.value}.",
-                implementation="none",
-            )
-            build.emit_unsupported(operation, build.classifications[operation.id].explanation)
-            continue
-        spec.function(operation, build)
-    _fill_missing_markers(build)
-
-
-def collect_records(build: HoudiniBuild, graph: SemanticGraph) -> list[TranslationRecord]:
-    records = []
-    for operation in graph.operations:
-        classification = build.classifications.get(operation.id)
-        if classification is None:
-            classification = Classification(
-                confidence=Confidence.UNSUPPORTED,
-                explanation=f"{operation.kind.value} was not classified.",
-                implementation="none",
-            )
-        records.append(
-            TranslationRecord(
-                operation_id=operation.id,
-                operation_name=operation.name,
-                operation=operation.kind.value,
-                classification=classification,
-                source_types=operation.source.node_types,
-                notes=list(operation.notes),
-            )
-        )
-        if operation.subgraph is not None:
-            nested = getattr(build, "nested", {}).get(operation.id)
-            if nested is not None:
-                records.extend(collect_records(nested, operation.subgraph))
-    return records
-
-
-def _ordered(graph: SemanticGraph):
-    incoming = {operation.id: 0 for operation in graph.operations}
-    outgoing: dict[str, list[str]] = {operation.id: [] for operation in graph.operations}
-    known = set(incoming)
-    for edge in graph.edges:
-        if edge.from_operation not in known or edge.to_operation not in known:
-            continue
-        incoming[edge.to_operation] += 1
-        outgoing[edge.from_operation].append(edge.to_operation)
-    queue = [operation_id for operation_id, degree in incoming.items() if degree == 0]
-    order = []
-    while queue:
-        operation_id = queue.pop(0)
-        order.append(operation_id)
-        for child in outgoing[operation_id]:
-            incoming[child] -= 1
-            if incoming[child] == 0:
-                queue.append(child)
-    seen = set(order)
-    order.extend(operation.id for operation in graph.operations if operation.id not in seen)
-    by_id = {operation.id: operation for operation in graph.operations}
-    return [by_id[operation_id] for operation_id in order]
-
-
-def _promote(build: HoudiniBuild) -> None:
-    existing = {spare.name for spare in build.spares}
-    for parameter in build.graph.interface:
-        if parameter.data_type in {DataType.GEOMETRY, DataType.MESH, DataType.CURVE, DataType.POINTS, DataType.INSTANCES, DataType.MATERIAL, DataType.OBJECT_REFERENCE, DataType.COLLECTION_REFERENCE}:
-            continue
-        from nodebridge.common.names import sanitize_identifier
-
-        name = sanitize_identifier(parameter.identifier or parameter.name)
-        if name in existing:
-            continue
-        kind = "float"
-        default = 0.0 if parameter.default is None else parameter.default
-        if parameter.data_type is DataType.INT:
-            kind = "int"
-            default = int(default or 0)
-        elif parameter.data_type is DataType.BOOL:
-            kind = "toggle"
-            default = bool(default)
-        elif parameter.data_type is DataType.STRING:
-            kind = "string"
-            default = "" if default is None else str(default)
-        elif parameter.data_type in {DataType.VECTOR3, DataType.COLOR, DataType.VECTOR4, DataType.VECTOR2}:
-            kind = "vector"
-            default = tuple(default) if isinstance(default, (list, tuple)) else (0.0, 0.0, 0.0)
         else:
-            try:
-                default = float(default)
-            except (TypeError, ValueError):
-                default = 0.0
-        build.spares.append(SpareParm(kind, name, parameter.name, default))
-        existing.add(name)
+            inline_where(graph, lambda g, op: True, diagnostics, f"{graph.kind.label} groups are flattened in Houdini")
+        return graph
+
+    def generate(self, result: "CompilationResult") -> GeneratedCode:
+        kind = result.semantic.kind
+        w = PyWriter()
+        self._header(w, result)
+        if kind == TreeKind.GEOMETRY:
+            self._geometry(w, result)
+        elif kind == TreeKind.SHADER:
+            from .materials import write_material_function
+
+            w.blank()
+            function = write_material_function(self, result, w, NameAllocator())
+            w.blank()
+            w.line("def build():")
+            w.line(f"    return {function}()")
+            w.blank()
+            w.line("material = build()")
+            w.line('print("NodeBridge: created material", material.path())')
+            self._footer(w)
+        else:
+            from .cop import write_compositor
+
+            write_compositor(self, result, w)
+            self._footer(w)
+        name = houdini_node_name(result.document.root)
+        return GeneratedCode(
+            target=self.id,
+            language="python",
+            filename=f"nodebridge_{name}_houdini.py",
+            code=w.text(),
+            run_instructions="Houdini: Windows > Python Source Editor, paste, then click Apply (or run in Windows > Python Shell).",
+        )
+
+    # -- script sections ----------------------------------------------------
+    def _header(self, w: PyWriter, result: "CompilationResult") -> None:
+        report = result.report
+        counts = report.counts
+        w.line('"""NodeBridge: generated Houdini Python.')
+        w.line("")
+        w.line(f"Source:  {report.source_kind} / {report.source_name}" + (f" ({report.source_application})" if report.source_application else ""))
+        w.line(f"Target:  {report.target_label}")
+        w.line(f"Translation: {counts['EXACT']} exact, {counts['EQUIVALENT']} equivalent, {counts['APPROXIMATE']} approximate, {counts['UNSUPPORTED']} unsupported")
+        w.line(f"Generated by NodeBridge {__version__}.")
+        w.line("")
+        w.line("Run inside Houdini: Windows > Python Source Editor, paste this script, click Apply.")
+        w.line("The script only creates new nodes; existing scene content is not modified.")
+        w.line("Equivalent / approximate operations are marked with sticky notes in the network.")
+        w.line('"""')
+        w.line("import hou")
+        w.blank()
+        w.block(HELPERS)
+        w.blank()
+
+    def _footer(self, w: PyWriter) -> None:
+        w.line("for nb_warning in NB_WARNINGS:")
+        w.line('    print("NodeBridge warning:", nb_warning)')
+
+    def _geometry(self, w: PyWriter, result: "CompilationResult") -> None:
+        graph = result.semantic
+        variables = NameAllocator({"obj", "geo", "hou", "build", "materials"})
+        libraries: set[str] = set()
+        library_mark = w.mark()
+        material_exprs: dict[str, str] = {}
+        if result.materials:
+            from .materials import write_material_function
+
+            w.blank()
+            w.line("def build_materials():")
+            w.indent()
+            w.line('"""Materials referenced by Set Material nodes."""')
+            w.line("created = {}")
+            for name, sub in result.materials.items():
+                w.blank()
+                inner = PyWriter()
+                function = write_material_function(self, sub, inner, NameAllocator(), nested=True)
+                w.block(inner.text())
+                w.line(f"created[{name!r}] = {function}().path()")
+            w.line("return created")
+            w.dedent()
+            for name in result.materials:
+                material_exprs[name] = f"materials.get({name!r}, '/mat/{houdini_node_name(name)}')"
+        w.blank()
+        w.line("def build():")
+        w.indent()
+        w.line('obj = hou.node("/obj")')
+        w.line(f'geo = nb_create(obj, "geo", "{houdini_node_name("nb_" + graph.name)}", run_init_scripts=False)')
+        templates = parameter_templates(graph.parameters)
+        if any(op.kind == "GEOMETRY_INPUT" for op in graph.ops.values()):
+            templates.append('hou.ToggleParmTemplate("use_source_object", "Use Source Object", default_value=False)')
+        if templates:
+            w.line(f"nb_add_parameters(geo, {graph.name!r}, [")
+            w.indent()
+            for template in templates:
+                w.line(template + ",")
+            w.dedent()
+            w.line("])")
+        if result.materials:
+            w.line("materials = build_materials()")
+        builder = SopBuilder(self, result, graph, w, Network("geo", graph.name, graph.parameters), variables, libraries=libraries)
+        builder.materials = material_exprs
+        builder.build()
+        w.blank()
+        w.line("geo.layoutChildren()" if result.options.organize_graph else "for child in geo.children(): child.moveToGoodPosition()")
+        w.line("nb_place_notes()")
+        w.line("return geo")
+        w.dedent()
+        w.blank()
+        w.line("geo = build()")
+        w.line('print("NodeBridge: created", geo.path())')
+        self._footer(w)
+        if libraries:
+            w.insert(library_mark, library_definitions(libraries))
 
 
-def _fill_missing_markers(build: HoudiniBuild) -> None:
-    """Every operation id must appear in the script, including noted field ops."""
+def parameter_templates(parameters: list[ExposedParameter]) -> list[str]:
+    templates = []
+    for p in parameters:
+        name = spare_parm_name(p.key)
+        label = p.name
+        value = p.current
+        bounds = _bounds(p)
+        if p.data_type == DataType.FLOAT:
+            default = _convert_param_scalar(value, p.role)
+            templates.append(f"hou.FloatParmTemplate({name!r}, {label!r}, 1, default_value=({literal(default)},){bounds})")
+        elif p.data_type == DataType.INT:
+            templates.append(f"hou.IntParmTemplate({name!r}, {label!r}, 1, default_value=({int(value or 0)},){bounds})")
+        elif p.data_type == DataType.BOOL:
+            templates.append(f"hou.ToggleParmTemplate({name!r}, {label!r}, default_value={bool(value)})")
+        elif p.data_type in (DataType.VECTOR3, DataType.ROTATION):
+            default = _convert_param_vector(value, p.role)
+            templates.append(f"hou.FloatParmTemplate({name!r}, {label!r}, 3, default_value={literal(default)})")
+        elif p.data_type == DataType.COLOR:
+            rgb = tuple(clean_number(float(c)) for c in (list(value or [1, 1, 1]) + [1, 1, 1])[:3])
+            templates.append(f"hou.FloatParmTemplate({name!r}, {label!r}, 3, default_value={literal(rgb)}, look=hou.parmLook.ColorSquare, naming_scheme=hou.parmNamingScheme.RGBA)")
+        else:
+            text = value.get("name", "") if isinstance(value, dict) else ("" if value is None else str(value))
+            templates.append(f"hou.StringParmTemplate({name!r}, {label!r}, 1, default_value=({text!r},))")
+    return templates
 
-    present = {node.op_id for node in build.nodes}
-    noted = "\n".join(build.notes)
-    for operation in build.graph.operations:
-        if operation.id in build.classifications and (operation.id in present or f"# operation: {operation.id} " in noted):
+
+def _bounds(p: ExposedParameter) -> str:
+    parts = []
+    for key, value in (("min", p.min_value), ("max", p.max_value)):
+        if isinstance(value, (int, float)) and math.isfinite(value) and abs(value) < 1e6:
+            converted = _convert_param_scalar(value, p.role) if p.data_type == DataType.FLOAT else int(value)
+            parts.append(f"{key}={literal(converted)}")
+    return (", " + ", ".join(parts)) if parts else ""
+
+
+def _convert_param_scalar(value: Any, role: ValueRole) -> float:
+    number = float(value or 0.0)
+    if role == ValueRole.ANGLE:
+        return clean_number(math.degrees(number))
+    return clean_number(number)
+
+
+def _convert_param_vector(value: Any, role: ValueRole) -> tuple:
+    items = [float(v) for v in (list(value or [0, 0, 0]) + [0, 0, 0])[:3]]
+    if role in (ValueRole.POSITION, ValueRole.DIRECTION, ValueRole.NORMAL):
+        items = list(convert_point(items, target=HOUDINI))
+    elif role == ValueRole.SCALE:
+        items = list(convert_scale(items, target=HOUDINI))
+    elif role == ValueRole.EULER:
+        items = [math.degrees(items[0]), math.degrees(items[2]), -math.degrees(items[1])]
+    return tuple(clean_number(v) for v in items)
+
+
+def build_subnet(b: SopBuilder, op: SemanticOp) -> None:
+    """A node group instance becomes a SOP subnet with promoted parameters."""
+    sub = b.graph.subgraphs[op.params["graph"]]
+    var = b.node(op, "subnet")
+    inputs = [o for o in sub.ops.values() if o.kind == "GEOMETRY_INPUT"]
+    for index, inner in enumerate(inputs):
+        inner.annotations["subnet_input"] = index
+        b.connect(var, index, b.stream_for(op.inputs.get(inner.params.get("identifier", ""))))
+    templates = parameter_templates(sub.parameters)
+    if templates:
+        b.w.line(f"nb_add_parameters({var}, {sub.name!r}, [")
+        b.w.indent()
+        for template in templates:
+            b.w.line(template + ",")
+        b.w.dedent()
+        b.w.line("])")
+    for parameter in sub.parameters:
+        value = op.inputs.get(parameter.identifier)
+        if value is None:
             continue
-        if operation.id not in build.classifications:
-            build.classifications[operation.id] = Classification(
-                confidence=Confidence.UNSUPPORTED,
-                explanation=f"{operation.kind.value} produced no Houdini node.",
-                implementation="none",
-            )
-        build.note(operation)
+        count = 3 if parameter.data_type in (DataType.VECTOR3, DataType.COLOR, DataType.ROTATION) else 1
+        integer = parameter.data_type in (DataType.INT, DataType.BOOL)
+        if isinstance(value, Const) and count == 1 and not integer:
+            b.set(var, spare_parm_name(parameter.key), _convert_param_scalar(value.value, parameter.role))
+        elif isinstance(value, Const) and count == 3:
+            b.set(var, spare_parm_name(parameter.key), _convert_param_vector(value.value, parameter.role))
+        else:
+            b.set_value(var, spare_parm_name(parameter.key), value, parameter.role, count=count, default=parameter.current, integer=integer)
+    inputs_var = f"{var}_inputs"
+    if inputs:
+        b.w.line(f"{inputs_var} = {var}.indirectInputs()")
+    inner = SopBuilder(b.backend, b.result, sub, b.w, Network(var, sub.name, sub.parameters), b.vars, in_subnet=True, libraries=b.libraries)
+    inner.indirect_inputs = inputs_var
+    inner.materials = b.materials
+    inner.build()
+    outputs = [out for out in sub.outputs if out.data_type in GEOMETRY_TYPES]
+    for index, out in enumerate(outputs):
+        stream = inner.stream_for(out.value)
+        node = b.vars.allocate(python_identifier(f"{var}_output_{index}"))
+        b.w.line(f'{node} = nb_create({var}, "output", "{houdini_node_name("OUT_" + (out.label or out.name))}")')
+        b.w.line(f'nb_set({node}, "outputidx", {index})')
+        if stream is not None:
+            b.connect(node, 0, stream)
+        if index == 0:
+            b.w.line(f"{node}.setDisplayFlag(True)")
+        b.set_output(op, out.name, var, index)
+    b.w.line(f"{var}.layoutChildren()")
+
+
+register_backend(HoudiniBackend())

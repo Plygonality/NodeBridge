@@ -1,107 +1,103 @@
 """Translator registry.
 
-Translators register themselves instead of living in one ``if node.type``
-cascade. A translator is a function plus the confidence metadata the report
-uses when the function does not override it.
+Translators are registered per (target, context, semantic kind)::
 
-    @translator(
-        OperationKind.SCATTER,
-        "houdini",
-        confidence=Confidence.EQUIVALENT,
-        implementation="scatter::2.0",
-        explanation="Houdini Scatter SOP distributes points on the input surface.",
-    )
-    def translate_scatter(operation, context):
-        ...
+    @translator("SCATTER", target="houdini", context="sop",
+                confidence=Confidence.EQUIVALENT,
+                implementation="scatter SOP",
+                explanation="...")
+    def scatter(ctx, op): ...
+
+Each translator carries its own capability metadata (default confidence,
+implementation, limitations, fallback) and an optional ``classify``
+function for configuration-dependent confidence. The capability matrix
+is derived from this metadata; nothing is hardcoded in UI tables.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable, Iterable
 
-from nodebridge.ir.semantic import Operation, OperationKind
-from nodebridge.translation.confidence import Classification, Confidence
+from .confidence import Classification, Confidence
 
 
 @dataclass
 class Translator:
-    operation: OperationKind
+    kind: str
     target: str
+    context: str
+    fn: Callable[..., Any]
     confidence: Confidence
-    implementation: str
-    explanation: str
+    implementation: str = ""
+    explanation: str = ""
     limitations: tuple[str, ...] = ()
-    fallback: str | None = None
-    function: Callable | None = None
+    fallback: str = ""
+    classify_fn: Callable[..., Classification | None] | None = None
 
-    def classification(self) -> Classification:
-        return Classification(
-            confidence=self.confidence,
-            explanation=self.explanation,
-            implementation=self.implementation,
-            limitations=self.limitations,
-            fallback=self.fallback,
-            emitted=self.confidence is not Confidence.UNSUPPORTED,
-        )
+    def default_classification(self) -> Classification:
+        return Classification(self.confidence, self.explanation, self.implementation, list(self.limitations), self.fallback)
+
+    def classify(self, op: Any, graph: Any) -> Classification:
+        base = self.default_classification()
+        if self.classify_fn is not None:
+            result = self.classify_fn(op, graph, base)
+            if result is not None:
+                return result
+        return base
 
 
 @dataclass
 class TranslatorRegistry:
-    """Maps ``(operation, target)`` to one translator."""
+    _items: dict[tuple[str, str, str], Translator] = field(default_factory=dict)
 
-    _items: dict[tuple[OperationKind, str], Translator] = field(default_factory=dict)
-
-    def register(self, translator: Translator) -> None:
-        key = (translator.operation, translator.target)
+    def register(self, item: Translator) -> Translator:
+        key = (item.target, item.context, item.kind)
         if key in self._items:
-            raise ValueError(
-                f"Translator already registered for {translator.operation.value} -> {translator.target}"
-            )
-        self._items[key] = translator
+            raise ValueError(f"translator already registered for {key}")
+        self._items[key] = item
+        return item
 
-    def get(self, operation: OperationKind, target: str) -> Translator | None:
-        return self._items.get((operation, target))
+    def get(self, target: str, context: str, kind: str) -> Translator | None:
+        return self._items.get((target, context, kind))
 
-    def for_target(self, target: str) -> list[Translator]:
-        return [item for (kind, name), item in self._items.items() if name == target]
+    def for_target(self, target: str, context: str | None = None) -> list[Translator]:
+        return [t for (tg, ctx, _), t in sorted(self._items.items()) if tg == target and (context is None or ctx == context)]
 
-    def operations(self) -> list[OperationKind]:
-        return sorted({kind for kind, _target in self._items}, key=lambda item: item.value)
+    def kinds(self, target: str, context: str) -> set[str]:
+        return {k for (tg, ctx, k) in self._items if tg == target and ctx == context}
+
+    def __len__(self) -> int:
+        return len(self._items)
 
 
 REGISTRY = TranslatorRegistry()
 
 
 def translator(
-    operation: OperationKind,
-    target: str,
+    kinds: str | Iterable[str],
     *,
+    target: str,
+    context: str,
     confidence: Confidence,
-    implementation: str,
-    explanation: str,
-    limitations: tuple[str, ...] = (),
-    fallback: str | None = None,
+    implementation: str = "",
+    explanation: str = "",
+    limitations: Iterable[str] = (),
+    fallback: str = "",
+    classify: Callable[..., Classification | None] | None = None,
+    registry: TranslatorRegistry | None = None,
 ):
-    """Register ``function`` as the translator for one operation and target."""
+    """Register a translator function for one or more semantic kinds."""
 
-    def decorate(function: Callable) -> Callable:
-        REGISTRY.register(
-            Translator(
-                operation=operation,
-                target=target,
-                confidence=confidence,
-                implementation=implementation,
-                explanation=explanation,
-                limitations=limitations,
-                fallback=fallback,
-                function=function,
+    names = [kinds] if isinstance(kinds, str) else list(kinds)
+
+    target_registry = registry if registry is not None else REGISTRY
+
+    def decorator(fn):
+        for kind in names:
+            target_registry.register(
+                Translator(kind, target, context, fn, confidence, implementation, explanation, tuple(limitations), fallback, classify)
             )
-        )
-        return function
+        return fn
 
-    return decorate
-
-
-def require_translator(operation: Operation, target: str) -> Translator | None:
-    return REGISTRY.get(operation.kind, target)
+    return decorator

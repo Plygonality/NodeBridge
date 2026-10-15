@@ -1,648 +1,560 @@
-"""Geometry Nodes lowering.
+"""Geometry Nodes lifters: Blender node syntax -> semantic operations.
 
-Each Blender node type is a function that builds a semantic operation.
-The node type string is stored as source metadata and is not the translation key.
+Socket names below were verified against Blender 4.2 LTS and 4.5 LTS.
+Lookups use socket *names* with a preference for enabled sockets, so
+nodes with per-data-type socket variants (Random Value, Compare, Map
+Range) resolve to the socket Blender actually uses.
 """
 
 from __future__ import annotations
 
-from nodebridge.frontend.blender.lower import finish, integer, number, text, vector
-from nodebridge.ir.graph import GraphNode, NodeTree
-from nodebridge.ir.operations import field_port, geometry_port, make_operation, value_port
-from nodebridge.ir.semantic import OperationKind
-from nodebridge.ir.types import DataType
+from ...ir.graph import GraphNode, TreeKind
+from ...ir.semantic import Const
+from ...ir.types import DataType
+from .lifting import LiftContext, LiftError, lifts
 
+GN = (TreeKind.GEOMETRY,)
+ANY_KIND = (TreeKind.GEOMETRY, TreeKind.SHADER, TreeKind.COMPOSITOR)
 
-def register_all(register) -> None:
-    for node_type, function in LOWERERS.items():
-        register(node_type)(function)
 
+# --- constants and built-in fields --------------------------------------
+@lifts("ShaderNodeValue", kinds=(TreeKind.GEOMETRY, TreeKind.COMPOSITOR))
+def _value(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.bind(node, "Value", Const(node.outputs[0].default if node.outputs else 0.0, DataType.FLOAT))
 
-def _scatter(node: GraphNode, tree: NodeTree):
-    method = str(node.properties.get("distribute_method", "RANDOM")).upper()
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.SCATTER,
-        name=node.label or node.name,
-        parameters={
-            "distribution_mode": "distance" if method == "POISSON" else "density",
-            "density": number(node, "Density", 10.0),
-            "seed": integer(node, "Seed", 0),
-            "distance_min": number(node, "Distance Min", 0.1),
-            "density_attribute": "",
-            "normal_alignment": True,
-        },
-        inputs={
-            "geometry": geometry_port("geometry", DataType.MESH),
-            "selection": field_port("selection", DataType.BOOL),
-            "density": field_port("density", DataType.FLOAT),
-        },
-        outputs={
-            "points": geometry_port("points", DataType.POINTS),
-            "normal": field_port("normal", DataType.VECTOR3),
-            "rotation": field_port("rotation", DataType.VECTOR3),
-        },
-    )
-    return finish(
-        node,
-        operation,
-        {"Mesh": "geometry", "Geometry": "geometry", "Selection": "selection", "Density": "density", "Distance Min": "distance_min", "Seed": "seed"},
-        {"Points": "points", "Normal": "normal", "Rotation": "rotation"},
-    )
 
+@lifts("FunctionNodeInputVector", kinds=GN)
+def _vector(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.bind(node, "Vector", Const(ctx.prop(node, "vector", [0.0, 0.0, 0.0]), DataType.VECTOR3))
 
-def _primitive(kind: str):
-    def lower(node: GraphNode, tree: NodeTree):
-        size = vector(node, "Size", (1.0, 1.0, 1.0))
-        if kind == "grid":
-            size = (number(node, "Size X", 1.0), number(node, "Size Y", 1.0), 0.0)
-        operation = make_operation(
-            id=node.id,
-            kind=OperationKind.PRIMITIVE,
-            name=node.label or node.name,
-            parameters={
-                "primitive": kind,
-                "size": size,
-                "radius": number(node, "Radius", 1.0),
-                "depth": number(node, "Depth", number(node, "Height", 1.0)),
-                "vertices": (
-                    integer(node, "Vertices X", integer(node, "Vertices", 16)),
-                    integer(node, "Vertices Y", integer(node, "Segments", 8)),
-                    integer(node, "Vertices Z", integer(node, "Rings", 8)),
-                ),
-            },
-            inputs={"size": value_port("size", DataType.VECTOR3)},
-            outputs={"geometry": geometry_port("geometry", DataType.MESH)},
-        )
-        return finish(
-            node,
-            operation,
-            {"Size": "size", "Size X": "size_x", "Size Y": "size_y", "Radius": "radius", "Depth": "depth", "Vertices": "vertices"},
-            {"Mesh": "geometry", "Geometry": "geometry"},
-        )
 
-    return lower
+@lifts("FunctionNodeInputInt", kinds=GN)
+def _int(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.bind(node, "Integer", Const(ctx.prop(node, "integer", 0), DataType.INT))
 
 
-def _curve(kind: str):
-    def lower(node: GraphNode, tree: NodeTree):
-        operation = make_operation(
-            id=node.id,
-            kind=OperationKind.CURVE,
-            name=node.label or node.name,
-            parameters={
-                "primitive": kind,
-                "radius": number(node, "Radius", 1.0),
-                "resolution": integer(node, "Resolution", 16),
-            },
-            outputs={"geometry": geometry_port("geometry", DataType.CURVE)},
-        )
-        return finish(node, operation, {"Radius": "radius", "Resolution": "resolution"}, {"Curve": "geometry"})
+@lifts("FunctionNodeInputBool", kinds=GN)
+def _bool(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.bind(node, "Boolean", Const(ctx.prop(node, "boolean", False), DataType.BOOL))
 
-    return lower
 
+@lifts("FunctionNodeInputColor", kinds=GN)
+def _color(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.bind(node, "Color", Const(ctx.prop(node, "value", [1.0, 1.0, 1.0, 1.0]), DataType.COLOR))
 
-def _transform(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.TRANSFORM,
-        name=node.label or node.name,
-        parameters={
-            "translation": vector(node, "Translation"),
-            "rotation": vector(node, "Rotation"),
-            "scale": vector(node, "Scale", (1.0, 1.0, 1.0)),
-            "mode": "geometry",
-        },
-        inputs={
-            "geometry": geometry_port("geometry"),
-            "translation": field_port("translation", DataType.VECTOR3),
-            "rotation": field_port("rotation", DataType.VECTOR3),
-            "scale": field_port("scale", DataType.VECTOR3),
-        },
-        outputs={"geometry": geometry_port("geometry")},
-    )
-    return finish(
-        node,
-        operation,
-        {"Geometry": "geometry", "Translation": "translation", "Rotation": "rotation", "Scale": "scale"},
-        {"Geometry": "geometry"},
-    )
 
+@lifts("FunctionNodeInputString", kinds=GN)
+def _string(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.bind(node, "String", Const(ctx.prop(node, "string", ""), DataType.STRING))
 
-def _instance_transform(mode: str):
-    def lower(node: GraphNode, tree: NodeTree):
-        operation = make_operation(
-            id=node.id,
-            kind=OperationKind.TRANSFORM,
-            name=node.label or node.name,
-            parameters={
-                "mode": mode,
-                "rotation": vector(node, "Rotation"),
-                "scale": vector(node, "Scale", (1.0, 1.0, 1.0)),
-                "pivot": vector(node, "Pivot Point"),
-            },
-            inputs={
-                "geometry": geometry_port("geometry", DataType.INSTANCES),
-                "selection": field_port("selection", DataType.BOOL),
-                "rotation": field_port("rotation", DataType.VECTOR3),
-                "scale": field_port("scale", DataType.VECTOR3),
-            },
-            outputs={"geometry": geometry_port("geometry", DataType.INSTANCES)},
-        )
-        return finish(
-            node,
-            operation,
-            {"Instances": "geometry", "Selection": "selection", "Rotation": "rotation", "Scale": "scale", "Pivot Point": "pivot"},
-            {"Instances": "geometry"},
-        )
 
-    return lower
-
-
-def _set_position(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.TRANSFORM_POINTS,
-        name=node.label or node.name,
-        parameters={"position": vector(node, "Position"), "offset": vector(node, "Offset")},
-        inputs={
-            "geometry": geometry_port("geometry"),
-            "selection": field_port("selection", DataType.BOOL),
-            "position": field_port("position", DataType.VECTOR3),
-            "offset": field_port("offset", DataType.VECTOR3),
-        },
-        outputs={"geometry": geometry_port("geometry")},
-    )
-    return finish(
-        node,
-        operation,
-        {"Geometry": "geometry", "Selection": "selection", "Position": "position", "Offset": "offset"},
-        {"Geometry": "geometry"},
-    )
-
-
-def _attribute(attribute: str, data_type: DataType):
-    def lower(node: GraphNode, tree: NodeTree):
-        operation = make_operation(
-            id=node.id,
-            kind=OperationKind.ATTRIBUTE_READ,
-            name=node.label or node.name,
-            parameters={"attribute": attribute, "data_type": data_type.value},
-            outputs={"value": field_port("value", data_type)},
-        )
-        output_name = {"position": "Position", "normal": "Normal", "index": "Index", "id": "ID"}[attribute]
-        return finish(node, operation, {}, {output_name: "value", "Value": "value"})
-
-    return lower
-
-
-def _math(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.MATH,
-        name=node.label or node.name,
-        parameters={
-            "operation": str(node.properties.get("operation", "ADD")).lower(),
-            "a": number(node, "Value", 0.0),
-            "b": number(node, "Value_001", 0.0),
-            "c": number(node, "Value_002", 0.0),
-            "use_clamp": bool(node.properties.get("use_clamp", False)),
-        },
-        inputs={
-            "a": field_port("a", DataType.FLOAT),
-            "b": field_port("b", DataType.FLOAT),
-            "c": field_port("c", DataType.FLOAT),
-        },
-        outputs={"value": field_port("value", DataType.FLOAT)},
-    )
-    return finish(node, operation, {"Value": "a", "Value_001": "b", "Value_002": "c"}, {"Value": "value"})
-
-
-def _vector_math(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.VECTOR_MATH,
-        name=node.label or node.name,
-        parameters={
-            "operation": str(node.properties.get("operation", "ADD")).lower(),
-            "a": vector(node, "Vector"),
-            "b": vector(node, "Vector_001"),
-            "c": number(node, "Scale", 1.0),
-        },
-        inputs={
-            "a": field_port("a", DataType.VECTOR3),
-            "b": field_port("b", DataType.VECTOR3),
-            "c": field_port("c", DataType.FLOAT),
-        },
-        outputs={"vector": field_port("vector", DataType.VECTOR3), "value": field_port("value", DataType.FLOAT)},
-    )
-    return finish(
-        node,
-        operation,
-        {"Vector": "a", "Vector_001": "b", "Scale": "c"},
-        {"Vector": "vector", "Value": "value"},
-    )
-
-
-def _map_range(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.MAP_RANGE,
-        name=node.label or node.name,
-        parameters={
-            "clamp": bool(node.properties.get("clamp", True) or node.properties.get("use_clamp", True)),
-            "value": number(node, "Value", 0.0),
-            "from_min": number(node, "From Min", 0.0),
-            "from_max": number(node, "From Max", 1.0),
-            "to_min": number(node, "To Min", 0.0),
-            "to_max": number(node, "To Max", 1.0),
-        },
-        inputs={name: field_port(name, DataType.FLOAT) for name in ("value", "from_min", "from_max", "to_min", "to_max")},
-        outputs={"result": field_port("result", DataType.FLOAT)},
-    )
-    return finish(
-        node,
-        operation,
-        {"Value": "value", "From Min": "from_min", "From Max": "from_max", "To Min": "to_min", "To Max": "to_max"},
-        {"Result": "result"},
-    )
-
-
-def _compare(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.COMPARE,
-        name=node.label or node.name,
-        parameters={
-            "operation": str(node.properties.get("operation", "LESS_THAN")).lower(),
-            "a": number(node, "A", 0.0),
-            "b": number(node, "B", 0.0),
-        },
-        inputs={"a": field_port("a", DataType.FLOAT), "b": field_port("b", DataType.FLOAT)},
-        outputs={"result": field_port("result", DataType.BOOL)},
-    )
-    return finish(node, operation, {"A": "a", "B": "b", "A_001": "a"}, {"Result": "result"})
-
-
-def _boolean_math(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.BOOLEAN_MATH,
-        name=node.label or node.name,
-        parameters={"operation": str(node.properties.get("operation", "AND")).lower(), "a": False, "b": False},
-        inputs={"a": field_port("a", DataType.BOOL), "b": field_port("b", DataType.BOOL)},
-        outputs={"result": field_port("result", DataType.BOOL)},
-    )
-    return finish(node, operation, {"Boolean": "a", "Boolean_001": "b"}, {"Boolean": "result"})
-
-
-def _switch(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.SWITCH,
-        name=node.label or node.name,
-        parameters={"switch": bool(node.input("Switch").default) if node.input("Switch") and isinstance(node.input("Switch").default, bool) else False},
-        inputs={
-            "switch": field_port("switch", DataType.BOOL),
-            "false": geometry_port("false"),
-            "true": geometry_port("true"),
-        },
-        outputs={"output": geometry_port("output")},
-    )
-    return finish(node, operation, {"Switch": "switch", "False": "false", "True": "true"}, {"Output": "output"})
-
-
-def _noise(noise_type: str):
-    def lower(node: GraphNode, tree: NodeTree):
-        operation = make_operation(
-            id=node.id,
-            kind=OperationKind.NOISE,
-            name=node.label or node.name,
-            parameters={
-                "noise_type": noise_type,
-                "scale": number(node, "Scale", 5.0),
-                "detail": number(node, "Detail", 2.0),
-                "roughness": number(node, "Roughness", 0.5),
-                "distortion": number(node, "Distortion", 0.0),
-                "dimensions": str(node.properties.get("noise_dimensions", "3D")),
-                "vector": vector(node, "Vector"),
-            },
-            inputs={
-                "vector": field_port("vector", DataType.VECTOR3),
-                "scale": field_port("scale", DataType.FLOAT),
-                "detail": field_port("detail", DataType.FLOAT),
-                "roughness": field_port("roughness", DataType.FLOAT),
-                "distortion": field_port("distortion", DataType.FLOAT),
-            },
-            outputs={"fac": field_port("fac", DataType.FLOAT), "color": field_port("color", DataType.COLOR)},
-        )
-        return finish(
-            node,
-            operation,
-            {"Vector": "vector", "W": "w", "Scale": "scale", "Detail": "detail", "Roughness": "roughness", "Distortion": "distortion"},
-            {"Fac": "fac", "Color": "color", "Distance": "fac"},
-        )
-
-    return lower
-
-
-def _random(node: GraphNode, tree: NodeTree):
-    data_type = str(node.properties.get("data_type", "FLOAT")).lower()
-    minimum = node.parameter("Min", 0.0)
-    maximum = node.parameter("Max", 1.0)
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.RANDOM,
-        name=node.label or node.name,
-        parameters={
-            "data_type": data_type,
-            "minimum": minimum,
-            "maximum": maximum,
-            "seed": integer(node, "Seed", 0),
-        },
-        inputs={
-            "minimum": field_port("minimum", DataType.FLOAT),
-            "maximum": field_port("maximum", DataType.FLOAT),
-            "seed": value_port("seed", DataType.INT),
-            "id": field_port("id", DataType.INT),
-        },
-        outputs={"value": field_port("value", DataType.FLOAT if "vector" not in data_type else DataType.VECTOR3)},
-    )
-    return finish(node, operation, {"Min": "minimum", "Max": "maximum", "Seed": "seed", "ID": "id"}, {"Value": "value"})
-
-
-def _instance(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.INSTANCE,
-        name=node.label or node.name,
-        parameters={
-            "scale": vector(node, "Scale", (1.0, 1.0, 1.0)),
-            "rotation": vector(node, "Rotation"),
-            "pick_instance": bool(node.parameter("Pick Instance", False)),
-        },
-        inputs={
-            "points": geometry_port("points", DataType.POINTS),
-            "instance": geometry_port("instance"),
-            "selection": field_port("selection", DataType.BOOL),
-            "rotation": field_port("rotation", DataType.VECTOR3),
-            "scale": field_port("scale", DataType.VECTOR3),
-        },
-        outputs={"instances": geometry_port("instances", DataType.INSTANCES)},
-    )
-    return finish(
-        node,
-        operation,
-        {"Points": "points", "Instance": "instance", "Selection": "selection", "Rotation": "rotation", "Scale": "scale"},
-        {"Instances": "instances"},
-    )
-
-
-def _passthrough(kind: OperationKind, data_type: DataType = DataType.GEOMETRY):
-    def lower(node: GraphNode, tree: NodeTree):
-        operation = make_operation(
-            id=node.id,
-            kind=kind,
-            name=node.label or node.name,
-            inputs={"geometry": geometry_port("geometry", data_type)},
-            outputs={"geometry": geometry_port("geometry", data_type)},
-        )
-        return finish(node, operation, {"Geometry": "geometry", "Instances": "geometry", "Curve": "geometry", "Mesh": "geometry"}, {"Geometry": "geometry", "Instances": "geometry", "Curve": "geometry", "Mesh": "geometry"})
-
-    return lower
-
-
-def _merge(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.MERGE,
-        name=node.label or node.name,
-        outputs={"geometry": geometry_port("geometry")},
-    )
-    return finish(node, operation, {}, {"Geometry": "geometry"})
-
-
-def _material(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.MATERIAL_ASSIGNMENT,
-        name=node.label or node.name,
-        parameters={"material": text(node, "Material", "")},
-        inputs={"geometry": geometry_port("geometry"), "selection": field_port("selection", DataType.BOOL), "material": value_port("material", DataType.MATERIAL)},
-        outputs={"geometry": geometry_port("geometry")},
-    )
-    return finish(node, operation, {"Geometry": "geometry", "Selection": "selection", "Material": "material"}, {"Geometry": "geometry"})
-
-
-def _extrude(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.EXTRUDE,
-        name=node.label or node.name,
-        parameters={
-            "mode": str(node.properties.get("mode", "FACES")).lower(),
-            "offset_scale": number(node, "Offset Scale", 1.0),
-            "offset": vector(node, "Offset", (0.0, 0.0, 1.0)),
-            "individual": bool(node.properties.get("individual", False) if "individual" in node.properties else False),
-        },
-        inputs={"geometry": geometry_port("geometry", DataType.MESH), "selection": field_port("selection", DataType.BOOL)},
-        outputs={"geometry": geometry_port("geometry", DataType.MESH)},
-    )
-    return finish(node, operation, {"Mesh": "geometry", "Selection": "selection", "Offset": "offset", "Offset Scale": "offset_scale"}, {"Mesh": "geometry"})
-
-
-def _subdivide(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.SUBDIVIDE,
-        name=node.label or node.name,
-        parameters={"level": integer(node, "Level", 1)},
-        inputs={"geometry": geometry_port("geometry", DataType.MESH)},
-        outputs={"geometry": geometry_port("geometry", DataType.MESH)},
-    )
-    return finish(node, operation, {"Mesh": "geometry", "Level": "level"}, {"Mesh": "geometry"})
-
-
-def _delete(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.DELETE_GEOMETRY,
-        name=node.label or node.name,
-        parameters={"domain": str(node.properties.get("domain", "FACE")).lower(), "mode": str(node.properties.get("mode", "ALL")).lower()},
-        inputs={"geometry": geometry_port("geometry"), "selection": field_port("selection", DataType.BOOL)},
-        outputs={"geometry": geometry_port("geometry")},
-    )
-    return finish(node, operation, {"Geometry": "geometry", "Selection": "selection"}, {"Geometry": "geometry"})
-
-
-def _separate(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.SEPARATE,
-        name=node.label or node.name,
-        parameters={"domain": str(node.properties.get("domain", "POINT")).lower()},
-        inputs={"geometry": geometry_port("geometry"), "selection": field_port("selection", DataType.BOOL)},
-        outputs={"selected": geometry_port("selected"), "inverted": geometry_port("inverted")},
-    )
-    return finish(node, operation, {"Geometry": "geometry", "Selection": "selection"}, {"Selection": "selected", "Inverted": "inverted"})
-
-
-def _resample(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.CURVE_RESAMPLE,
-        name=node.label or node.name,
-        parameters={"mode": str(node.properties.get("mode", "LENGTH")).lower(), "length": number(node, "Length", 0.1), "count": integer(node, "Count", 16)},
-        inputs={"geometry": geometry_port("geometry", DataType.CURVE)},
-        outputs={"geometry": geometry_port("geometry", DataType.CURVE)},
-    )
-    return finish(node, operation, {"Curve": "geometry", "Length": "length", "Count": "count"}, {"Curve": "geometry"})
-
-
-def _curve_to_mesh(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.CURVE_TO_MESH,
-        name=node.label or node.name,
-        parameters={"radius": number(node, "Scale", 1.0)},
-        inputs={"curve": geometry_port("curve", DataType.CURVE), "profile": geometry_port("profile", DataType.CURVE)},
-        outputs={"geometry": geometry_port("geometry", DataType.MESH)},
-    )
-    return finish(node, operation, {"Curve": "curve", "Profile Curve": "profile"}, {"Mesh": "geometry"})
-
-
-def _proximity(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.PROXIMITY,
-        name=node.label or node.name,
-        parameters={"target_element": str(node.properties.get("target_element", "FACES")).lower()},
-        inputs={"source": geometry_port("source"), "target": geometry_port("target")},
-        outputs={"distance": field_port("distance", DataType.FLOAT), "position": field_port("position", DataType.VECTOR3)},
-    )
-    return finish(node, operation, {"Source Position": "source_position", "Target": "target"}, {"Distance": "distance", "Position": "position"})
-
-
-def _raycast(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.RAYCAST,
-        name=node.label or node.name,
-        parameters={"ray_direction": vector(node, "Ray Direction", (0.0, 0.0, -1.0)), "ray_length": number(node, "Ray Length", 100.0)},
-        inputs={"geometry": geometry_port("geometry"), "target": geometry_port("target")},
-        outputs={"is_hit": field_port("is_hit", DataType.BOOL), "hit_position": field_port("hit_position", DataType.VECTOR3), "hit_normal": field_port("hit_normal", DataType.VECTOR3)},
-    )
-    return finish(
-        node,
-        operation,
-        {"Target Geometry": "target", "Attribute": "attribute", "Source Position": "source_position", "Ray Direction": "ray_direction", "Ray Length": "ray_length"},
-        {"Is Hit": "is_hit", "Hit Position": "hit_position", "Hit Normal": "hit_normal"},
-    )
-
-
-def _boolean(node: GraphNode, tree: NodeTree):
-    operation = make_operation(
-        id=node.id,
-        kind=OperationKind.BOOLEAN,
-        name=node.label or node.name,
-        parameters={"operation": str(node.properties.get("operation", "DIFFERENCE")).lower()},
-        inputs={"a": geometry_port("a", DataType.MESH), "b": geometry_port("b", DataType.MESH)},
-        outputs={"geometry": geometry_port("geometry", DataType.MESH)},
-    )
-    return finish(node, operation, {"Mesh 1": "a", "Mesh 2": "b", "Mesh": "a"}, {"Mesh": "geometry"})
-
-
-def _group_input(node: GraphNode, tree: NodeTree):
-    from nodebridge.ir.semantic import Operation
-
-    outputs = {}
-    names = {}
-    defaults = {}
-    labels = {}
-    interface_defaults = {item.identifier: item.default for item in tree.interface}
-    interface_names = {item.identifier: item.name for item in tree.interface}
-    for socket in node.outputs:
-        if not socket.identifier:
-            continue
-        port_type = socket.data_type
-        role_port = geometry_port(socket.identifier, port_type) if port_type in {DataType.GEOMETRY, DataType.MESH, DataType.CURVE, DataType.POINTS, DataType.INSTANCES} else field_port(socket.identifier, port_type)
-        outputs[socket.identifier] = role_port
-        names[socket.identifier] = socket.identifier
-        defaults[socket.identifier] = interface_defaults.get(socket.identifier, socket.default)
-        labels[socket.identifier] = interface_names.get(socket.identifier, socket.name)
-    operation = Operation(
-        id=node.id,
-        kind=OperationKind.GROUP_INPUT,
-        name=node.label or node.name or "Group Input",
-        parameters={"defaults": defaults, "labels": labels},
-        outputs=outputs,
-    )
-    return finish(node, operation, {}, names)
-
-
-def _group_output(node: GraphNode, tree: NodeTree):
-    from nodebridge.ir.semantic import Operation
-
-    inputs = {}
-    names = {}
-    for socket in node.inputs:
-        if not socket.identifier:
-            continue
-        port_type = socket.data_type
-        inputs[socket.identifier] = geometry_port(socket.identifier, port_type) if port_type in {DataType.GEOMETRY, DataType.MESH, DataType.CURVE, DataType.POINTS, DataType.INSTANCES} else field_port(socket.identifier, port_type)
-        names[socket.identifier] = socket.identifier
-    operation = Operation(id=node.id, kind=OperationKind.GROUP_OUTPUT, name=node.label or node.name or "Group Output", inputs=inputs)
-    return finish(node, operation, names, {})
-
-
-LOWERERS = {
-    "NodeGroupInput": _group_input,
-    "NodeGroupOutput": _group_output,
-    "GeometryNodeJoinGeometry": _merge,
-    "GeometryNodeTransform": _transform,
-    "GeometryNodeSetPosition": _set_position,
-    "GeometryNodeInputPosition": _attribute("position", DataType.VECTOR3),
-    "GeometryNodeInputNormal": _attribute("normal", DataType.VECTOR3),
-    "GeometryNodeInputIndex": _attribute("index", DataType.INT),
-    "GeometryNodeInputID": _attribute("id", DataType.INT),
-    "ShaderNodeMath": _math,
-    "ShaderNodeVectorMath": _vector_math,
-    "ShaderNodeMapRange": _map_range,
-    "FunctionNodeCompare": _compare,
-    "FunctionNodeBooleanMath": _boolean_math,
-    "GeometryNodeSwitch": _switch,
-    "ShaderNodeTexNoise": _noise("noise"),
-    "ShaderNodeTexVoronoi": _noise("voronoi"),
-    "FunctionNodeRandomValue": _random,
-    "GeometryNodeDistributePointsOnFaces": _scatter,
-    "GeometryNodeInstanceOnPoints": _instance,
-    "GeometryNodeRealizeInstances": _passthrough(OperationKind.REALIZE_INSTANCES, DataType.INSTANCES),
-    "GeometryNodeRotateInstances": _instance_transform("instance_rotation"),
-    "GeometryNodeScaleInstances": _instance_transform("instance_scale"),
-    "GeometryNodeSetMaterial": _material,
-    "GeometryNodeMeshCube": _primitive("cube"),
-    "GeometryNodeMeshGrid": _primitive("grid"),
-    "GeometryNodeMeshUVSphere": _primitive("uv_sphere"),
-    "GeometryNodeMeshIcoSphere": _primitive("ico_sphere"),
-    "GeometryNodeMeshCylinder": _primitive("cylinder"),
-    "GeometryNodeMeshCone": _primitive("cone"),
-    "GeometryNodeMeshCircle": _primitive("circle"),
-    "GeometryNodeMeshLine": _primitive("line"),
-    "GeometryNodeCurvePrimitiveCircle": _curve("circle"),
-    "GeometryNodeCurvePrimitiveLine": _curve("line"),
-    "GeometryNodeCurvePrimitiveQuadrilateral": _curve("quadrilateral"),
-    "GeometryNodeCurvePrimitiveBezierSegment": _curve("bezier"),
-    "GeometryNodeCurveStar": _curve("star"),
-    "GeometryNodeCurveSpiral": _curve("spiral"),
-    "GeometryNodeCurveArc": _curve("arc"),
-    "GeometryNodeCurveToMesh": _curve_to_mesh,
-    "GeometryNodeMeshToCurve": _passthrough(OperationKind.MESH_TO_CURVE, DataType.MESH),
-    "GeometryNodeResampleCurve": _resample,
-    "GeometryNodeExtrudeMesh": _extrude,
-    "GeometryNodeSubdivideMesh": _subdivide,
-    "GeometryNodeDeleteGeometry": _delete,
-    "GeometryNodeSeparateGeometry": _separate,
-    "GeometryNodeProximity": _proximity,
-    "GeometryNodeRaycast": _raycast,
-    "GeometryNodeMeshBoolean": _boolean,
+_FIELDS = {
+    "GeometryNodeInputPosition": ("position", "Position", DataType.VECTOR3),
+    "GeometryNodeInputNormal": ("normal", "Normal", DataType.VECTOR3),
+    "GeometryNodeInputIndex": ("index", "Index", DataType.INT),
+    "GeometryNodeInputID": ("id", "ID", DataType.INT),
 }
+
+
+@lifts(*_FIELDS, kinds=GN)
+def _field_input(ctx: LiftContext, node: GraphNode) -> None:
+    field, socket, data_type = _FIELDS[node.type]
+    ctx.emit("FIELD_INPUT", node, params={"field": field}, outputs={"value": socket}, output_types={"value": data_type})
+
+
+# --- math / logic (shared by all tree kinds) ----------------------------
+@lifts("ShaderNodeMath", "CompositorNodeMath", kinds=ANY_KIND)
+def _math(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = [s for s in node.inputs if s.enabled]
+    values = {key: _input_by_identifier(ctx, node, s.identifier) for key, s in zip("abc", inputs)}
+    ctx.emit("MATH", node, values, {"operation": ctx.prop(node, "operation", "ADD"), "clamp": bool(ctx.prop(node, "use_clamp", False))}, {"value": "Value"})
+
+
+def _input_by_identifier(ctx: LiftContext, node: GraphNode, identifier: str):
+    edges = ctx.edges_into(node, identifier)
+    if edges:
+        return ctx._resolve(edges[0])
+    socket = node.input(identifier)
+    return Const(socket.default, socket.data_type) if socket is not None else None
+
+
+@lifts("ShaderNodeVectorMath", kinds=ANY_KIND)
+def _vector_math(ctx: LiftContext, node: GraphNode) -> None:
+    sockets = {s.identifier: s for s in node.inputs if s.enabled}
+    values = {}
+    for key, identifier in (("a", "Vector"), ("b", "Vector_001"), ("c", "Vector_002"), ("scale", "Scale")):
+        if identifier in sockets:
+            values[key] = _input_by_identifier(ctx, node, identifier)
+    ctx.emit("VECTOR_MATH", node, values, {"operation": ctx.prop(node, "operation", "ADD")}, {"vector": "Vector", "value": "Value"}, output_types={"vector": DataType.VECTOR3, "value": DataType.FLOAT})
+
+
+@lifts("ShaderNodeClamp", kinds=ANY_KIND)
+def _clamp(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "MATH",
+        node,
+        {"a": ctx.input(node, "Value"), "b": ctx.input(node, "Min"), "c": ctx.input(node, "Max")},
+        {"operation": "CLAMP_RANGE" if ctx.prop(node, "clamp_type") == "RANGE" else "CLAMP_MINMAX"},
+        {"value": "Result"},
+    )
+
+
+@lifts("FunctionNodeFloatToInt", kinds=GN)
+def _float_to_int(ctx: LiftContext, node: GraphNode) -> None:
+    mode = {"ROUND": "ROUND", "FLOOR": "FLOOR", "CEILING": "CEIL", "TRUNCATE": "TRUNC"}[ctx.prop(node, "rounding_mode", "ROUND")]
+    ctx.emit("MATH", node, {"a": ctx.input(node, "Float")}, {"operation": mode}, {"value": "Integer"}, output_types={"value": DataType.INT})
+
+
+@lifts("ShaderNodeMapRange", kinds=ANY_KIND)
+def _map_range(ctx: LiftContext, node: GraphNode) -> None:
+    vector = ctx.prop(node, "data_type", "FLOAT") == "FLOAT_VECTOR"
+    first = "Vector" if vector else "Value"
+    inputs = {"value": ctx.input(node, first)}
+    for key, name in (("from_min", "From Min"), ("from_max", "From Max"), ("to_min", "To Min"), ("to_max", "To Max"), ("steps", "Steps")):
+        inputs[key] = ctx.input(node, name)
+    out = "Vector" if vector else "Result"
+    ctx.emit(
+        "MAP_RANGE",
+        node,
+        inputs,
+        {"interpolation": ctx.prop(node, "interpolation_type", "LINEAR"), "clamp": bool(ctx.prop(node, "clamp", True)), "data_type": ctx.prop(node, "data_type", "FLOAT")},
+        {"result": out},
+        output_types={"result": DataType.VECTOR3 if vector else DataType.FLOAT},
+    )
+
+
+@lifts("FunctionNodeCompare", kinds=GN)
+def _compare(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = {"a": ctx.input(node, "A"), "b": ctx.input(node, "B")}
+    for key, name in (("c", "C"), ("angle", "Angle"), ("epsilon", "Epsilon")):
+        socket = node.find_input(name)
+        if socket is not None and socket.enabled:
+            inputs[key] = ctx.input(node, name)
+    ctx.emit(
+        "COMPARE",
+        node,
+        inputs,
+        {"operation": ctx.prop(node, "operation", "GREATER_THAN"), "data_type": ctx.prop(node, "data_type", "FLOAT"), "mode": ctx.prop(node, "mode", "ELEMENT")},
+        {"result": "Result"},
+        output_types={"result": DataType.BOOL},
+    )
+
+
+@lifts("FunctionNodeBooleanMath", kinds=GN)
+def _boolean_math(ctx: LiftContext, node: GraphNode) -> None:
+    sockets = [s for s in node.inputs if s.enabled]
+    values = {key: _input_by_identifier(ctx, node, s.identifier) for key, s in zip("ab", sockets)}
+    ctx.emit("BOOLEAN_MATH", node, values, {"operation": ctx.prop(node, "operation", "AND")}, {"value": "Boolean"}, output_types={"value": DataType.BOOL})
+
+
+@lifts("ShaderNodeCombineXYZ", kinds=ANY_KIND)
+def _combine(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("COMBINE_VECTOR", node, {k: ctx.input(node, k.upper()) for k in "xyz"}, outputs={"vector": "Vector"})
+
+
+@lifts("ShaderNodeSeparateXYZ", kinds=ANY_KIND)
+def _separate(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("SEPARATE_VECTOR", node, {"vector": ctx.input(node, "Vector")}, outputs={k: k.upper() for k in "xyz"})
+
+
+@lifts("ShaderNodeMix", kinds=ANY_KIND)
+def _mix(ctx: LiftContext, node: GraphNode) -> None:
+    data_type = ctx.prop(node, "data_type", "FLOAT")
+    suffix = {"FLOAT": "Float", "VECTOR": "Vector", "RGBA": "Color", "ROTATION": "Rotation"}.get(data_type, "Float")
+    factor_id = "Factor_Vector" if data_type == "VECTOR" and ctx.prop(node, "factor_mode") == "NON_UNIFORM" else "Factor_Float"
+    ctx.emit(
+        "MIX",
+        node,
+        {"factor": _input_by_identifier(ctx, node, factor_id), "a": _input_by_identifier(ctx, node, f"A_{suffix}"), "b": _input_by_identifier(ctx, node, f"B_{suffix}")},
+        {
+            "data_type": data_type,
+            "blend_type": ctx.prop(node, "blend_type", "MIX"),
+            "clamp_factor": bool(ctx.prop(node, "clamp_factor", True)),
+            "clamp_result": bool(ctx.prop(node, "clamp_result", False)),
+        },
+        {"result": "Result"},
+        output_types={"result": {"FLOAT": DataType.FLOAT, "VECTOR": DataType.VECTOR3, "RGBA": DataType.COLOR}.get(data_type, DataType.FLOAT)},
+    )
+
+
+@lifts("ShaderNodeValToRGB", kinds=ANY_KIND)
+def _color_ramp(ctx: LiftContext, node: GraphNode) -> None:
+    ramp = ctx.prop(node, "color_ramp", {}) or {}
+    ctx.emit(
+        "COLOR_RAMP",
+        node,
+        {"fac": ctx.input(node, "Fac")},
+        {"stops": ramp.get("elements", []), "interpolation": ramp.get("interpolation", "LINEAR"), "color_mode": ramp.get("color_mode", "RGB")},
+        {"color": "Color", "alpha": "Alpha"},
+    )
+
+
+@lifts("FunctionNodeRandomValue", kinds=GN)
+def _random(ctx: LiftContext, node: GraphNode) -> None:
+    data_type = ctx.prop(node, "data_type", "FLOAT")
+    inputs = {"id": ctx.input(node, "ID", implicit="id"), "seed": ctx.input(node, "Seed")}
+    if data_type == "BOOLEAN":
+        inputs["probability"] = ctx.input(node, "Probability")
+    else:
+        inputs["min"] = ctx.input(node, "Min")
+        inputs["max"] = ctx.input(node, "Max")
+    out_type = {"FLOAT": DataType.FLOAT, "INT": DataType.INT, "FLOAT_VECTOR": DataType.VECTOR3, "BOOLEAN": DataType.BOOL}[data_type]
+    ctx.emit("RANDOM", node, inputs, {"data_type": data_type}, {"value": "Value"}, output_types={"value": out_type})
+
+
+@lifts("GeometryNodeSwitch", kinds=GN)
+def _switch(ctx: LiftContext, node: GraphNode) -> None:
+    input_type = ctx.prop(node, "input_type", "GEOMETRY")
+    if input_type == "MENU":
+        raise LiftError("Menu Switch is not lifted yet.")
+    out_socket = node.find_output("Output")
+    ctx.emit(
+        "SWITCH",
+        node,
+        {"switch": ctx.input(node, "Switch"), "false": ctx.input(node, "False"), "true": ctx.input(node, "True")},
+        {"input_type": input_type},
+        {"output": "Output"},
+        output_types={"output": out_socket.data_type if out_socket else DataType.ANY},
+    )
+
+
+@lifts("ShaderNodeTexNoise", kinds=(TreeKind.GEOMETRY, TreeKind.SHADER))
+def _noise(ctx: LiftContext, node: GraphNode) -> None:
+    implicit = "position" if ctx.kind == TreeKind.GEOMETRY else "generated"
+    inputs = {"vector": ctx.input(node, "Vector", implicit=implicit)}
+    for key, name in (("w", "W"), ("scale", "Scale"), ("detail", "Detail"), ("roughness", "Roughness"), ("lacunarity", "Lacunarity"), ("distortion", "Distortion")):
+        socket = node.find_input(name)
+        if socket is not None and socket.enabled:
+            inputs[key] = ctx.input(node, name)
+    ctx.emit(
+        "NOISE",
+        node,
+        inputs,
+        {"dimensions": ctx.prop(node, "noise_dimensions", "3D"), "noise_type": ctx.prop(node, "noise_type", "FBM"), "normalize": bool(ctx.prop(node, "normalize", True))},
+        {"fac": "Fac", "color": "Color"},
+    )
+
+
+@lifts("ShaderNodeTexVoronoi", kinds=(TreeKind.GEOMETRY, TreeKind.SHADER))
+def _voronoi(ctx: LiftContext, node: GraphNode) -> None:
+    implicit = "position" if ctx.kind == TreeKind.GEOMETRY else "generated"
+    inputs = {"vector": ctx.input(node, "Vector", implicit=implicit), "scale": ctx.input(node, "Scale"), "randomness": ctx.input(node, "Randomness")}
+    if node.find_input("Detail") is not None:
+        inputs["detail"] = ctx.input(node, "Detail")
+    ctx.emit(
+        "VORONOI",
+        node,
+        inputs,
+        {"dimensions": ctx.prop(node, "voronoi_dimensions", "3D"), "feature": ctx.prop(node, "feature", "F1"), "distance": ctx.prop(node, "distance", "EUCLIDEAN")},
+        {"distance": "Distance", "color": "Color", "position": "Position"},
+    )
+
+
+# --- geometry ------------------------------------------------------------
+@lifts("GeometryNodeJoinGeometry", kinds=GN)
+def _join(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("MERGE", node, {"geometry": ctx.multi_input(node, "Geometry")}, outputs={"geometry": "Geometry"})
+
+
+@lifts("GeometryNodeTransform", kinds=GN)
+def _transform(ctx: LiftContext, node: GraphNode) -> None:
+    if ctx.prop(node, "mode", "COMPONENTS") != "COMPONENTS":
+        raise LiftError("Transform Geometry in Matrix mode is not lifted yet.")
+    ctx.emit(
+        "TRANSFORM",
+        node,
+        {"geometry": ctx.input(node, "Geometry"), "translation": ctx.input(node, "Translation"), "rotation": ctx.input(node, "Rotation"), "scale": ctx.input(node, "Scale")},
+        outputs={"geometry": "Geometry"},
+    )
+
+
+@lifts("GeometryNodeSetPosition", kinds=GN)
+def _set_position(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = {"geometry": ctx.input(node, "Geometry"), "selection": ctx.input(node, "Selection"), "offset": ctx.input(node, "Offset")}
+    if ctx.has_link(node, "Position"):
+        inputs["position"] = ctx.input(node, "Position")
+    ctx.emit("SET_POSITION", node, inputs, outputs={"geometry": "Geometry"})
+
+
+_PRIMITIVES = {
+    "GeometryNodeMeshCube": ("cube", {"size": "Size", "vertices_x": "Vertices X", "vertices_y": "Vertices Y", "vertices_z": "Vertices Z"}),
+    "GeometryNodeMeshGrid": ("grid", {"size_x": "Size X", "size_y": "Size Y", "vertices_x": "Vertices X", "vertices_y": "Vertices Y"}),
+    "GeometryNodeMeshUVSphere": ("uv_sphere", {"segments": "Segments", "rings": "Rings", "radius": "Radius"}),
+    "GeometryNodeMeshIcoSphere": ("ico_sphere", {"radius": "Radius", "subdivisions": "Subdivisions"}),
+    "GeometryNodeMeshCylinder": ("cylinder", {"vertices": "Vertices", "side_segments": "Side Segments", "fill_segments": "Fill Segments", "radius": "Radius", "depth": "Depth"}),
+    "GeometryNodeMeshCone": (
+        "cone",
+        {"vertices": "Vertices", "side_segments": "Side Segments", "fill_segments": "Fill Segments", "radius_top": "Radius Top", "radius_bottom": "Radius Bottom", "depth": "Depth"},
+    ),
+    "GeometryNodeMeshLine": ("line", {"count": "Count", "start": "Start Location", "offset": "Offset"}),
+    "GeometryNodeMeshCircle": ("circle", {"vertices": "Vertices", "radius": "Radius"}),
+}
+
+
+@lifts(*_PRIMITIVES, kinds=GN)
+def _primitive(ctx: LiftContext, node: GraphNode) -> None:
+    shape, sockets = _PRIMITIVES[node.type]
+    params = {"shape": shape}
+    if "fill_type" in node.parameters:
+        params["fill_type"] = node.parameters["fill_type"]
+    if shape == "line":
+        params["mode"] = ctx.prop(node, "mode", "OFFSET")
+        if params["mode"] != "OFFSET" or ctx.prop(node, "count_mode", "TOTAL") != "TOTAL":
+            raise LiftError("Mesh Line is lifted only in Offset / Total count mode.")
+    ctx.emit("PRIMITIVE", node, {key: ctx.input(node, name) for key, name in sockets.items()}, params, {"geometry": "Mesh", "uv": "UV Map"})
+
+
+@lifts("GeometryNodeCurvePrimitiveLine", kinds=GN)
+def _curve_line(ctx: LiftContext, node: GraphNode) -> None:
+    if ctx.prop(node, "mode", "POINTS") != "POINTS":
+        raise LiftError("Curve Line is lifted only in Points mode.")
+    ctx.emit("CURVE", node, {"start": ctx.input(node, "Start"), "end": ctx.input(node, "End")}, {"shape": "line"}, {"geometry": "Curve"})
+
+
+@lifts("GeometryNodeCurvePrimitiveCircle", kinds=GN)
+def _curve_circle(ctx: LiftContext, node: GraphNode) -> None:
+    if ctx.prop(node, "mode", "RADIUS") != "RADIUS":
+        raise LiftError("Curve Circle is lifted only in Radius mode.")
+    ctx.emit("CURVE", node, {"resolution": ctx.input(node, "Resolution"), "radius": ctx.input(node, "Radius")}, {"shape": "circle"}, {"geometry": "Curve"})
+
+
+@lifts("GeometryNodeCurveSpiral", kinds=GN)
+def _curve_spiral(ctx: LiftContext, node: GraphNode) -> None:
+    keys = {"resolution": "Resolution", "rotations": "Rotations", "start_radius": "Start Radius", "end_radius": "End Radius", "height": "Height"}
+    ctx.emit("CURVE", node, {k: ctx.input(node, n) for k, n in keys.items()}, {"shape": "spiral", "reverse": bool(ctx.prop(node, "reverse", False))}, {"geometry": "Curve"})
+
+
+@lifts("GeometryNodeDistributePointsOnFaces", kinds=GN)
+def _distribute(ctx: LiftContext, node: GraphNode) -> None:
+    method = ctx.prop(node, "distribute_method", "RANDOM")
+    inputs = {"geometry": ctx.input(node, "Mesh"), "selection": ctx.input(node, "Selection"), "seed": ctx.input(node, "Seed")}
+    if method == "RANDOM":
+        inputs["density"] = ctx.input(node, "Density")
+    else:
+        inputs["distance_min"] = ctx.input(node, "Distance Min")
+        inputs["density_max"] = ctx.input(node, "Density Max")
+        inputs["density_factor"] = ctx.input(node, "Density Factor")
+    ctx.emit(
+        "SCATTER",
+        node,
+        inputs,
+        {"distribution_mode": "random" if method == "RANDOM" else "poisson", "normal_alignment": False},
+        {"points": "Points", "normal": "Normal", "rotation": "Rotation"},
+        output_types={"points": DataType.POINTS, "normal": DataType.VECTOR3, "rotation": DataType.ROTATION},
+    )
+
+
+@lifts("GeometryNodeInstanceOnPoints", kinds=GN)
+def _instance(ctx: LiftContext, node: GraphNode) -> None:
+    names = {"points": "Points", "selection": "Selection", "instance": "Instance", "pick_instance": "Pick Instance", "instance_index": "Instance Index", "rotation": "Rotation", "scale": "Scale"}
+    inputs = {key: ctx.input(node, name) for key, name in names.items()}
+    if not ctx.has_link(node, "Instance Index") and inputs.get("pick_instance") == Const(False, DataType.BOOL):
+        inputs.pop("instance_index", None)
+    ctx.emit("INSTANCE", node, inputs, outputs={"instances": "Instances"}, output_types={"instances": DataType.INSTANCES})
+
+
+@lifts("GeometryNodeRealizeInstances", kinds=GN)
+def _realize(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("REALIZE_INSTANCES", node, {"geometry": ctx.input(node, "Geometry")}, outputs={"geometry": "Geometry"})
+
+
+@lifts("GeometryNodeRotateInstances", "GeometryNodeScaleInstances", "GeometryNodeTranslateInstances", kinds=GN)
+def _instance_transform(ctx: LiftContext, node: GraphNode) -> None:
+    mode = {"GeometryNodeRotateInstances": "rotate", "GeometryNodeScaleInstances": "scale", "GeometryNodeTranslateInstances": "translate"}[node.type]
+    inputs = {"geometry": ctx.input(node, "Instances"), "selection": ctx.input(node, "Selection"), "local_space": ctx.input(node, "Local Space")}
+    if mode == "rotate":
+        inputs.update(rotation=ctx.input(node, "Rotation"), pivot=ctx.input(node, "Pivot Point"))
+    elif mode == "scale":
+        inputs.update(scale=ctx.input(node, "Scale"), pivot=ctx.input(node, "Center"))
+    else:
+        inputs.update(translation=ctx.input(node, "Translation"))
+    ctx.emit("INSTANCE_TRANSFORM", node, inputs, {"mode": mode}, {"geometry": "Instances"}, output_types={"geometry": DataType.INSTANCES})
+
+
+@lifts("GeometryNodeSetMaterial", kinds=GN)
+def _set_material(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "MATERIAL_ASSIGNMENT",
+        node,
+        {"geometry": ctx.input(node, "Geometry"), "selection": ctx.input(node, "Selection"), "material": ctx.input(node, "Material")},
+        outputs={"geometry": "Geometry"},
+    )
+
+
+@lifts("GeometryNodeExtrudeMesh", kinds=GN)
+def _extrude(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = {
+        "geometry": ctx.input(node, "Mesh"),
+        "selection": ctx.input(node, "Selection"),
+        "offset_scale": ctx.input(node, "Offset Scale"),
+    }
+    if ctx.has_link(node, "Offset"):
+        inputs["offset"] = ctx.input(node, "Offset")
+    individual = node.find_input("Individual")
+    if individual is not None and individual.enabled:
+        inputs["individual"] = ctx.input(node, "Individual")
+    ctx.emit("EXTRUDE", node, inputs, {"mode": ctx.prop(node, "mode", "FACES")}, {"geometry": "Mesh", "top": "Top", "side": "Side"}, output_types={"top": DataType.BOOL, "side": DataType.BOOL})
+
+
+@lifts("GeometryNodeSubdivideMesh", "GeometryNodeSubdivisionSurface", kinds=GN)
+def _subdivide(ctx: LiftContext, node: GraphNode) -> None:
+    method = "simple" if node.type == "GeometryNodeSubdivideMesh" else "catmull_clark"
+    ctx.emit("SUBDIVIDE", node, {"geometry": ctx.input(node, "Mesh"), "level": ctx.input(node, "Level")}, {"method": method}, {"geometry": "Mesh"})
+
+
+@lifts("GeometryNodeDeleteGeometry", kinds=GN)
+def _delete(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "DELETE_GEOMETRY",
+        node,
+        {"geometry": ctx.input(node, "Geometry"), "selection": ctx.input(node, "Selection")},
+        {"domain": ctx.prop(node, "domain", "POINT"), "mode": ctx.prop(node, "mode", "ALL")},
+        {"geometry": "Geometry"},
+    )
+
+
+@lifts("GeometryNodeSeparateGeometry", kinds=GN)
+def _separate_geometry(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "SEPARATE",
+        node,
+        {"geometry": ctx.input(node, "Geometry"), "selection": ctx.input(node, "Selection")},
+        {"domain": ctx.prop(node, "domain", "POINT")},
+        {"selection": "Selection", "inverted": "Inverted"},
+    )
+
+
+@lifts("GeometryNodeProximity", kinds=GN)
+def _proximity(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "PROXIMITY",
+        node,
+        {"target": ctx.input(node, "Target"), "source_position": ctx.input(node, "Source Position", implicit="position")},
+        {"target_element": ctx.prop(node, "target_element", "FACES")},
+        {"position": "Position", "distance": "Distance", "is_valid": "Is Valid"},
+        output_types={"position": DataType.VECTOR3, "distance": DataType.FLOAT, "is_valid": DataType.BOOL},
+    )
+
+
+@lifts("GeometryNodeRaycast", kinds=GN)
+def _raycast(ctx: LiftContext, node: GraphNode) -> None:
+    if ctx.has_link(node, "Attribute"):
+        ctx.warn("lift.raycast_attribute", f"{node.display_name}: the Attribute sampling of Raycast is not translated.", node)
+    ctx.emit(
+        "RAYCAST",
+        node,
+        {
+            "target": ctx.input(node, "Target Geometry"),
+            "source_position": ctx.input(node, "Source Position", implicit="position"),
+            "ray_direction": ctx.input(node, "Ray Direction"),
+            "ray_length": ctx.input(node, "Ray Length"),
+        },
+        {"mapping": ctx.prop(node, "mapping", "INTERPOLATED")},
+        {"is_hit": "Is Hit", "hit_position": "Hit Position", "hit_normal": "Hit Normal", "hit_distance": "Hit Distance"},
+        output_types={"is_hit": DataType.BOOL, "hit_position": DataType.VECTOR3, "hit_normal": DataType.VECTOR3, "hit_distance": DataType.FLOAT},
+    )
+
+
+@lifts("GeometryNodeCurveToMesh", kinds=GN)
+def _curve_to_mesh(ctx: LiftContext, node: GraphNode) -> None:
+    inputs = {"geometry": ctx.input(node, "Curve"), "profile": ctx.input(node, "Profile Curve"), "fill_caps": ctx.input(node, "Fill Caps")}
+    if node.find_input("Scale") is not None:
+        inputs["scale"] = ctx.input(node, "Scale")
+    ctx.emit("CURVE_TO_MESH", node, inputs, outputs={"geometry": "Mesh"})
+
+
+@lifts("GeometryNodeResampleCurve", kinds=GN)
+def _resample(ctx: LiftContext, node: GraphNode) -> None:
+    mode = ctx.prop(node, "mode", "COUNT")
+    inputs = {"geometry": ctx.input(node, "Curve"), "selection": ctx.input(node, "Selection")}
+    if mode == "COUNT":
+        inputs["count"] = ctx.input(node, "Count")
+    elif mode == "LENGTH":
+        inputs["length"] = ctx.input(node, "Length")
+    ctx.emit("CURVE_RESAMPLE", node, inputs, {"mode": mode}, {"geometry": "Curve"})
+
+
+@lifts("GeometryNodeMeshToCurve", kinds=GN)
+def _mesh_to_curve(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("MESH_TO_CURVE", node, {"geometry": ctx.input(node, "Mesh"), "selection": ctx.input(node, "Selection")}, outputs={"geometry": "Curve"})
+
+
+@lifts("GeometryNodeMeshToPoints", kinds=GN)
+def _mesh_to_points(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "MESH_TO_POINTS",
+        node,
+        {"geometry": ctx.input(node, "Mesh"), "selection": ctx.input(node, "Selection"), "radius": ctx.input(node, "Radius")},
+        {"mode": ctx.prop(node, "mode", "VERTICES")},
+        {"geometry": "Points"},
+    )
+
+
+@lifts("GeometryNodeMeshBoolean", kinds=GN)
+def _boolean(ctx: LiftContext, node: GraphNode) -> None:
+    operation = ctx.prop(node, "operation", "DIFFERENCE")
+    inputs = {"mesh_b": ctx.multi_input(node, "Mesh 2")}
+    if operation == "DIFFERENCE":
+        inputs["mesh_a"] = ctx.input(node, "Mesh 1")
+    ctx.emit("BOOLEAN", node, inputs, {"operation": operation}, {"geometry": "Mesh"})
+
+
+@lifts("GeometryNodeObjectInfo", kinds=GN)
+def _object_info(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "OBJECT_REFERENCE",
+        node,
+        {"object": ctx.input(node, "Object"), "as_instance": ctx.input(node, "As Instance")},
+        {"transform_space": ctx.prop(node, "transform_space", "ORIGINAL")},
+        {"geometry": "Geometry", "location": "Location", "rotation": "Rotation", "scale": "Scale"},
+    )
+
+
+@lifts("GeometryNodeCollectionInfo", kinds=GN)
+def _collection_info(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit("COLLECTION_REFERENCE", node, {"collection": ctx.input(node, "Collection")}, outputs={"geometry": "Instances"}, output_types={"geometry": DataType.INSTANCES})
+
+
+@lifts("GeometryNodeInputNamedAttribute", kinds=GN)
+def _named_attribute(ctx: LiftContext, node: GraphNode) -> None:
+    data_type = ctx.prop(node, "data_type", "FLOAT")
+    out_type = {"FLOAT": DataType.FLOAT, "INT": DataType.INT, "FLOAT_VECTOR": DataType.VECTOR3, "FLOAT_COLOR": DataType.COLOR, "BOOLEAN": DataType.BOOL}.get(data_type, DataType.FLOAT)
+    ctx.emit("ATTRIBUTE_READ", node, {"name": ctx.input(node, "Name")}, {"data_type": data_type}, {"value": "Attribute", "exists": "Exists"}, output_types={"value": out_type, "exists": DataType.BOOL})
+
+
+@lifts("GeometryNodeStoreNamedAttribute", kinds=GN)
+def _store_named_attribute(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "ATTRIBUTE_WRITE",
+        node,
+        {"geometry": ctx.input(node, "Geometry"), "selection": ctx.input(node, "Selection"), "name": ctx.input(node, "Name"), "value": ctx.input(node, "Value")},
+        {"data_type": ctx.prop(node, "data_type", "FLOAT"), "domain": ctx.prop(node, "domain", "POINT")},
+        {"geometry": "Geometry"},
+    )
+
+
+@lifts("FunctionNodeAlignEulerToVector", "FunctionNodeAlignRotationToVector", kinds=GN)
+def _align(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.emit(
+        "ALIGN_ROTATION",
+        node,
+        {"rotation": ctx.input(node, "Rotation"), "factor": ctx.input(node, "Factor"), "vector": ctx.input(node, "Vector")},
+        {"axis": ctx.prop(node, "axis", "Z"), "pivot_axis": ctx.prop(node, "pivot_axis", "AUTO")},
+        {"rotation": "Rotation"},
+        output_types={"rotation": DataType.ROTATION},
+    )
+
+
+_ZONES = {
+    "GeometryNodeSimulationInput": "Simulation zones",
+    "GeometryNodeSimulationOutput": "Simulation zones",
+    "GeometryNodeRepeatInput": "Repeat zones",
+    "GeometryNodeRepeatOutput": "Repeat zones",
+    "GeometryNodeForeachGeometryElementInput": "For Each Element zones",
+    "GeometryNodeForeachGeometryElementOutput": "For Each Element zones",
+}
+
+
+@lifts(*_ZONES, kinds=GN)
+def _zone(ctx: LiftContext, node: GraphNode) -> None:
+    ctx.unsupported(node, f"{_ZONES[node.type]} are not translated yet; the generated network evaluates the zone body once.")
