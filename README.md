@@ -111,6 +111,15 @@ nb_prop(random_scale_settings, "scale_min", unreal.Vector(SCALE_MIN, SCALE_MIN, 
 | **Unreal target (PCG)** | **Shader to Unreal Material** |
 | ![Panel with Unreal target](docs/images/nodebridge_npanel_unreal.jpg) | ![Shader editor with Unreal target](docs/images/nodebridge_shader_unreal.jpg) |
 
+The building and compositor examples, captured in Blender 4.5.14 LTS:
+
+| Building, target Houdini | Building, target Unreal Engine 5 |
+| --- | --- |
+| ![NodeBridge on the building example, target Houdini](docs/images/nodebridge_building_houdini.jpg) | ![NodeBridge on the building example, target Unreal](docs/images/nodebridge_building_unreal.jpg) |
+| 21 exact, 3 equivalent. Generate writes 325 lines of Houdini Python. | 4 exact, 3 equivalent, 5 approximate, 11 unsupported. PCG does not model the mesh, and the panel lists each gap. |
+| **Compositor, target Unreal Engine 5** | |
+| ![NodeBridge on the compositor example, target Unreal](docs/images/nodebridge_compositor_unreal.jpg) | Glare, color grade, and the vignette are approximate. Exact 0, equivalent 2, approximate 3. |
+
 Complete generated scripts and expected reports for all four examples are in [`examples/`](examples/):
 
 | Example | Blender system | Houdini | Unreal |
