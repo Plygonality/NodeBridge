@@ -363,27 +363,45 @@ def build_shader():
     return material
 
 
-def build_compositor():
-    scene = bpy.context.scene
-    scene.use_nodes = True
-    tree = scene.node_tree
+def _socket_by_id(node, identifier):
+    """Find a socket by identifier. Blender 5.x reuses display names (Lift, Gain, Result)."""
+    for collection in (node.inputs, node.outputs):
+        for socket in collection:
+            if socket.identifier == identifier:
+                return socket
+    raise KeyError(identifier)
+
+
+def _build_compositor_nodes(tree, *, group_output):
+    """Shared grading chain. Blender 5.2 replaced Composite and Mix RGB."""
     tree.nodes.clear()
     n = tree.nodes
     layers = n.new("CompositorNodeRLayers")
     glare = n.new("CompositorNodeGlare")
     glare.name = glare.label = "Bloom"
-    glare.glare_type = "FOG_GLOW"
-    glare.quality = "HIGH"
-    if "Highlights Threshold" in glare.inputs:
-        glare.inputs["Highlights Threshold"].default_value = 0.8
+    if hasattr(glare, "glare_type"):
+        glare.glare_type = "FOG_GLOW"
+        glare.quality = "HIGH"
     else:
+        _socket_by_id(glare, "Type").default_value = "Fog Glow"
+        _socket_by_id(glare, "Quality").default_value = "High"
+    threshold = next((s for s in glare.inputs if s.identifier == "Highlights Threshold"), None)
+    if threshold is not None:
+        threshold.default_value = 0.8
+    elif hasattr(glare, "threshold"):
         glare.threshold = 0.8
     _link(tree, layers, "Image", glare, "Image")
     grade = n.new("CompositorNodeColorBalance")
     grade.name = grade.label = "Grade"
-    if "Color Gain" in grade.inputs:
-        grade.inputs["Color Gain"].default_value = (1.05, 1.0, 0.92, 1.0)
-        grade.inputs["Color Lift"].default_value = (0.98, 1.0, 1.04, 1.0)
+    color_gain = next((s for s in grade.inputs if s.identifier == "Color Gain"), None)
+    color_lift = next((s for s in grade.inputs if s.identifier == "Color Lift"), None)
+    if color_gain is not None and color_lift is not None:
+        color_gain.default_value = (1.05, 1.0, 0.92, 1.0)
+        color_lift.default_value = (0.98, 1.0, 1.04, 1.0)
+        # 5.2 multiplies Base Lift (default 0) by Color Lift. Keep the color.
+        base_lift = next((s for s in grade.inputs if s.identifier == "Base Lift"), None)
+        if base_lift is not None:
+            base_lift.default_value = 1.0
     else:
         grade.gain = (1.05, 1.0, 0.92)
         grade.lift = (0.98, 1.0, 1.04)
@@ -402,15 +420,39 @@ def build_compositor():
     else:
         soften.size_x = soften.size_y = 200
     _link(tree, mask, "Mask", soften, "Image")
-    vignette = n.new("CompositorNodeMixRGB")
+    if group_output:
+        vignette = n.new("ShaderNodeMix")
+        vignette.data_type = "RGBA"
+        vignette.blend_type = "MULTIPLY"
+        _socket_by_id(vignette, "Factor_Float").default_value = 0.6
+        _link(tree, grade, "Image", vignette, _socket_by_id(vignette, "A_Color"))
+        _link(tree, soften, "Image", vignette, _socket_by_id(vignette, "B_Color"))
+        composite = n.new("NodeGroupOutput")
+        composite.name = composite.label = "Composite"
+        _link(tree, vignette, _socket_by_id(vignette, "Result_Color"), composite, "Image")
+    else:
+        vignette = n.new("CompositorNodeMixRGB")
+        vignette.blend_type = "MULTIPLY"
+        vignette.inputs["Fac"].default_value = 0.6
+        _link(tree, grade, "Image", vignette, 1)
+        _link(tree, soften, "Image", vignette, 2)
+        composite = n.new("CompositorNodeComposite")
+        _link(tree, vignette, "Image", composite, "Image")
     vignette.name = vignette.label = "Vignette"
-    vignette.blend_type = "MULTIPLY"
-    vignette.inputs["Fac"].default_value = 0.6
-    _link(tree, grade, "Image", vignette, 1)
-    _link(tree, soften, "Image", vignette, 2)
-    composite = n.new("CompositorNodeComposite")
-    _link(tree, vignette, "Image", composite, "Image")
     return tree
+
+
+def build_compositor():
+    scene = bpy.context.scene
+    # Blender 5.0+ stores the compositor on the scene as a node group.
+    if hasattr(scene, "compositing_node_group"):
+        tree = _new_tree("Compositing Node Tree", "CompositorNodeTree")
+        _socket(tree, "Image", "OUTPUT", "NodeSocketColor")
+        scene.compositing_node_group = tree
+        return _build_compositor_nodes(tree, group_output=True)
+    scene.use_nodes = True
+    tree = scene.node_tree
+    return _build_compositor_nodes(tree, group_output=False)
 
 
 def build_all():

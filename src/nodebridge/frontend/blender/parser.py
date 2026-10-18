@@ -1,7 +1,7 @@
 """Blender ``bpy`` node tree -> Graph IR.
 
-The parser reads real Blender data (verified on Blender 4.2 LTS and 4.5
-LTS) but never imports ``bpy`` itself: it only uses attributes of the
+The parser reads real Blender data (verified on Blender 4.2 LTS, 4.5
+LTS, and 5.2 LTS) but never imports ``bpy`` itself: it only uses attributes of the
 objects it is given, so the compiler stays importable outside Blender.
 
 Captured per tree: nodes, sockets (identifier, name, type, subtype,

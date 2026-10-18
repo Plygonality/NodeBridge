@@ -104,7 +104,10 @@ def resolve_source(context: Any, source_type: str = "AUTO") -> SourceSelection:
         return SourceSelection(tree, TreeKind.SHADER, name, name, f"Material {name}", None, source)
 
     tree = scene_compositor_tree(scene)
-    if tree is None or not getattr(scene, "use_nodes", True):
+    # 5.x enables the compositor by assigning compositing_node_group. use_nodes
+    # remains on the scene but is deprecated and is not the source of truth.
+    enabled = getattr(scene, "compositing_node_group", None) is not None or getattr(scene, "use_nodes", True)
+    if tree is None or not enabled:
         raise SourceNotFound("The scene has no compositor tree: enable 'Use Nodes' in the Compositor.")
     if space is not None and getattr(space, "type", "") == "NODE_EDITOR" and getattr(space, "tree_type", "") == "CompositorNodeTree" and space.edit_tree is not None:
         tree = space.edit_tree

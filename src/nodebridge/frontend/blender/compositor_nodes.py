@@ -31,6 +31,26 @@ def _composite(ctx: LiftContext, node: GraphNode) -> None:
     ctx.emit("COMPOSITE_OUTPUT", node, {"image": ctx.input(node, "Image")}, {"viewer": node.type == "CompositorNodeViewer"})
 
 
+def _menu_or_prop(ctx: LiftContext, node: GraphNode, socket_name: str, prop: str, default: str) -> str:
+    """Read a compositor enum. Blender 5.x moved several of these onto menu sockets."""
+    current = ctx.prop(node, prop, None)
+    if current not in (None, ""):
+        return current
+    socket = node.find_input(socket_name)
+    if socket is not None and isinstance(socket.default, str) and socket.default:
+        token = socket.default
+        aliases = {
+            "Fog Glow": "FOG_GLOW",
+            "Simple Star": "SIMPLE_STAR",
+            "Sun Beams": "SUN_BEAMS",
+            "High": "HIGH",
+            "Medium": "MEDIUM",
+            "Low": "LOW",
+        }
+        return aliases.get(token, token.upper().replace(" ", "_").replace("/", "_"))
+    return default
+
+
 @lifts("CompositorNodeGlare", kinds=CMP)
 def _glare(ctx: LiftContext, node: GraphNode) -> None:
     inputs = {
@@ -43,7 +63,13 @@ def _glare(ctx: LiftContext, node: GraphNode) -> None:
     else:
         mix = float(ctx.prop(node, "mix", 0.0))
         inputs["strength"] = Const((mix + 1.0) / 2.0, DataType.FLOAT)
-    ctx.emit("GLARE", node, inputs, {"glare_type": ctx.prop(node, "glare_type", "STREAKS"), "quality": ctx.prop(node, "quality", "MEDIUM")}, {"image": "Image"})
+    ctx.emit(
+        "GLARE",
+        node,
+        inputs,
+        {"glare_type": _menu_or_prop(ctx, node, "Type", "glare_type", "STREAKS"), "quality": _menu_or_prop(ctx, node, "Quality", "quality", "MEDIUM")},
+        {"image": "Image"},
+    )
 
 
 def _graded(ctx: LiftContext, node: GraphNode, base: str, color: str, prop: str):
