@@ -20,6 +20,7 @@ PCG_PINS = {
     "PCGMergeSettings": (["In"], ["Out"]),
     "PCGSpatialNoiseSettings": (["In"], ["Out"]),
     "PCGDensityFilterSettings": (["In"], ["Out"]),
+    "PCGCreatePointsSettings": (["In"], ["Out"]),
     "_input": ([], ["Input", "Landscape", "Landscape Height", "Actor", "Original Actor"]),
     "_output": (["Out"], []),
 }

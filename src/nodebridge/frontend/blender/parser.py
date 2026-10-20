@@ -225,11 +225,36 @@ def parse_document(tree: Any, *, root_name: str | None = None, source: dict | No
     return document
 
 
+_MISSING = object()
+
+
+def _modifier_input(modifier: Any, identifier: str) -> Any:
+    """Blender 5.x stores modifier inputs on ``properties.inputs``; 4.x uses ``modifier[id]``.
+
+    ``KeyError`` means this socket is not overridden. ``TypeError`` is a real
+    failure (the 5.x path was asked to index a modifier that cannot) and propagates.
+    """
+    props = getattr(modifier, "properties", None)
+    inputs = getattr(props, "inputs", None) if props is not None else None
+    if inputs is not None:
+        # 5.x: a missing identifier is "not overridden", not a reason to index the modifier.
+        try:
+            item = inputs[identifier]
+        except KeyError:
+            return _MISSING
+        if hasattr(item, "value"):
+            return item.value
+        return item
+    try:
+        return modifier[identifier]
+    except KeyError:
+        return _MISSING
+
+
 def apply_modifier_values(tree: NodeTree, modifier: Any) -> None:
     """Record a Geometry Nodes modifier's current inputs as interface values."""
     for socket in tree.inputs:
-        try:
-            value = modifier[socket.identifier]
-        except (KeyError, TypeError):
+        value = _modifier_input(modifier, socket.identifier)
+        if value is _MISSING:
             continue
         socket.value = plain(value)

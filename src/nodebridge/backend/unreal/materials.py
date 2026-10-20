@@ -13,6 +13,8 @@ from __future__ import annotations
 from typing import Any
 
 from ...backend.codegen import PyWriter, clean_number, literal
+from ...backend.escape import escape
+from ...backend.shader_lower import main_shader_input
 from ...common.coordinates import BLENDER, UNREAL, convert_point, uv_flip_required
 from ...common.names import NameAllocator, python_identifier, unreal_asset_name
 from ...common.units import BLENDER_UNITS, UNREAL_UNITS, convert_length
@@ -97,15 +99,38 @@ class MaterialBuilder:
         var, output = self.source(value, want, default if default is not None else 0.0)
         self.w.line(f"nb_link({var}, {output!r}, {target}, {input_name!r})")
 
+    def _relay(self, op: SemanticOp) -> tuple[str, str] | None:
+        key = main_shader_input(op)
+        value = op.inputs.get(key) if key else None
+        if value is None:
+            return None
+        want = F
+        if isinstance(value, Const) and isinstance(value.value, (list, tuple)):
+            want = COL
+        elif isinstance(value, Param):
+            parameter = self.graph.parameter(value.name)
+            if parameter is not None and parameter.data_type in (COL, V):
+                want = parameter.data_type
+        elif isinstance(value, Link):
+            produced = self.graph.ops[value.op].outputs.get(value.output)
+            if produced is not None and produced.base in (COL, V):
+                want = produced.base
+        return self.source(value, want, 0.0 if want == F else (0.0, 0.0, 0.0))
+
     def output(self, link: Link) -> tuple[str, str]:
         op = self.graph.ops[link.op]
         if op.id not in self.cache:
             item = self.backend.translator(op, CTX)
             classification = self.result.classification(self.graph, op)
             if item is None or classification.confidence == C.UNSUPPORTED or self.result.is_blocked(self.graph, op):
-                self.w.line(f"NB_WARNINGS.append({f'Not translated: {op.display_name} ({op.kind}); a constant 0 is used.'!r})")
-                var, _ = self.constant(0.0, F)
-                self.cache[op.id] = {name: (var, "") for name in op.outputs}
+                relayed = self._relay(op)
+                if relayed is not None:
+                    self.w.line(f"NB_WARNINGS.append({f'Not translated: {op.display_name} ({op.kind}); its main input is passed through.'!r})")
+                    self.cache[op.id] = {name: relayed for name in op.outputs}
+                else:
+                    self.w.line(f"NB_WARNINGS.append({f'Not translated: {op.display_name} ({op.kind}); a constant 0 is used.'!r})")
+                    var, _ = self.constant(0.0, F)
+                    self.cache[op.id] = {name: (var, "") for name in op.outputs}
             else:
                 if self.options.include_comments:
                     self.w.comment(f"{op.display_name}: {op.kind} [{classification.confidence.value}]")
@@ -134,7 +159,7 @@ def write_material(backend, result, w: PyWriter, variables: NameAllocator) -> st
     function = python_identifier(f"build_material_{name}")
     w.line(f"def {function}():")
     w.indent()
-    w.line(f'"""Material {name!r} as an Unreal Material asset."""')
+    w.line(f'"""Material {escape(name, language="doc")} as an Unreal Material asset."""')
     w.line(f'material = nb_create_asset("{unreal_asset_name(name, "M_")}", ASSET_PATH, unreal.Material, unreal.MaterialFactoryNew())')
     builder = MaterialBuilder(backend, result, graph, w, variables, "material")
     outputs = [op for op in graph.ops.values() if op.kind == "MATERIAL_OUTPUT"]
@@ -495,8 +520,40 @@ def _separate(mb: MaterialBuilder, op: SemanticOp) -> dict:
     return outputs
 
 
-@_mat("COLOR_OPERATION", C.EXACT, "OneMinus / Desaturation", "Invert and grayscale conversions.", classify=lambda op, g, base: Classification(C.UNSUPPORTED, f"Color operation {op.params.get('operation')} is not translated yet.", "none") if op.params.get("operation") not in ("invert", "rgb_to_bw") else None)
+def _color_classify(op, graph, base):
+    operation = op.params.get("operation")
+    if operation == "hue_saturation":
+        return Classification(C.EQUIVALENT, "Hue shift, desaturation and value multiply.", "HueShift + Desaturation", ["Hue is an offset from 0.5; saturation 1 is neutral."])
+    if operation not in ("invert", "rgb_to_bw"):
+        return Classification(C.UNSUPPORTED, f"Color operation {operation} is not translated yet.", "none")
+    return None
+
+
+def _hue_saturation(mb: MaterialBuilder, op: SemanticOp) -> dict:
+    shift = mb.expression(op, "MaterialExpressionHueShift")
+    mb.feed(shift, "", op.inputs.get("color"), COL, default=(1.0, 1.0, 1.0))
+    hue = op.inputs.get("a")
+    amount = 0.0
+    if isinstance(hue, Const) and isinstance(hue.value, (int, float)):
+        amount = float(hue.value) - 0.5
+    mb.prop(shift, "HueShift", literal(clean_number(amount)))
+    desat = mb.expression(op, "MaterialExpressionDesaturation", "_sat")
+    mb.w.line(f"nb_link({shift}, '', {desat}, '')")
+    sat = op.inputs.get("b")
+    fraction = 0.0
+    if isinstance(sat, Const) and isinstance(sat.value, (int, float)):
+        fraction = 1.0 - float(sat.value)
+    mb.prop(desat, "Fraction", literal(clean_number(fraction)))
+    mul = mb.expression(op, "MaterialExpressionMultiply", "_value")
+    mb.w.line(f"nb_link({desat}, '', {mul}, 'A')")
+    mb.feed(mul, "B", op.inputs.get("c"), F, default=1.0)
+    return {"color": (mul, "")}
+
+
+@_mat("COLOR_OPERATION", C.EXACT, "OneMinus / Desaturation / HueShift", "Invert, grayscale, and hue/saturation/value.", classify=_color_classify)
 def _color_op(mb: MaterialBuilder, op: SemanticOp) -> dict:
+    if op.params.get("operation") == "hue_saturation":
+        return _hue_saturation(mb, op)
     if op.params.get("operation") == "invert":
         return {"color": (mb.unary(op, "MaterialExpressionOneMinus", op.inputs.get("color"), COL), "")}
     var = mb.unary(op, "MaterialExpressionDesaturation", op.inputs.get("color"), COL)

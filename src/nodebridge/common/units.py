@@ -62,6 +62,20 @@ HOUDINI_VEX_UNITS = UnitSystem("houdini_vex", 1.0, AngleUnit.RADIANS)
 UNREAL_UNITS = UnitSystem("unreal", 0.01, AngleUnit.DEGREES)
 
 
+def scene_scale_of(source: dict | None) -> float:
+    """``document.source["unit_scale"]``, defaulting to 1 for missing or non-finite values."""
+    raw = (source or {}).get("unit_scale", 1.0)
+    if raw is None:
+        return 1.0
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 1.0
+    if not math.isfinite(value):
+        return 1.0
+    return value
+
+
 def convert_length(value: float, source: UnitSystem, target: UnitSystem, *, scene_scale: float = 1.0) -> float:
     meters = value * source.meters_per_unit * scene_scale
     return target.length_from_meters(meters)

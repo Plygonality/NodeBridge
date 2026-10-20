@@ -63,7 +63,7 @@ def _store(settings, selection, result) -> None:
     warnings = report.warnings()
     settings.warning_total = len(warnings)
     settings.messages.clear()
-    for line in warnings[:MAX_MESSAGES]:
+    for line in report.ui_warnings(MAX_MESSAGES):
         item = settings.messages.add()
         item.text = line
         item.level = "ERROR" if " | Unsupported | " in line or line.startswith("Error") else "WARNING"
@@ -102,16 +102,18 @@ class NODEBRIDGE_OT_generate(Operator):
         if result.code is None:
             self.report({"WARNING"}, f"{result.report.target_label}: nothing to generate for this tree type")
             return {"CANCELLED"}
+        errors = list(result.diagnostics.errors)
+        if errors:
+            settings.code_text = ""
+            settings.code_lines = 0
+            self.report({"ERROR"}, errors[0].message)
+            return {"CANCELLED"}
         name = f"{result.code.filename}"
         text = _text(name, result.code.code)
         settings.code_text = text.name
         settings.code_language = "Unreal Editor Python" if result.target == "unreal" else "Houdini Python"
         settings.code_lines = result.code.code.count("\n")
         settings.run_instructions = result.code.run_instructions
-        errors = [d for d in result.diagnostics.errors if d.code.startswith("script.")]
-        if errors:
-            self.report({"ERROR"}, errors[0].message)
-            return {"FINISHED"}
         self.report({"INFO"}, f"Generated {settings.code_lines} lines of {settings.code_language} ({text.name})")
         return {"FINISHED"}
 

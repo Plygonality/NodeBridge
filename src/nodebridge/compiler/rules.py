@@ -30,7 +30,7 @@ def _fold_constants(graph: SemanticGraph, m: Match) -> bool:
     op = m.root
     try:
         values = evaluate_op(graph, op)
-    except (NotConstant, ValueError, ZeroDivisionError, OverflowError):
+    except (NotConstant, ValueError, TypeError, KeyError, ZeroDivisionError, OverflowError):
         return False
     for output, ref in op.outputs.items():
         if output in values:
@@ -55,7 +55,15 @@ def _is_identity_transform(graph: SemanticGraph, op: SemanticOp) -> bool:
         value = op.inputs.get(name)
         if value is None:
             continue
-        if not isinstance(value, Const) or [round(float(v), 9) for v in value.value] != identity:
+        if not isinstance(value, Const) or value.value is None:
+            if value is None or (isinstance(value, Const) and value.value is None):
+                continue
+            return False
+        try:
+            items = [round(float(v), 9) for v in value.value]
+        except (TypeError, ValueError):
+            return False
+        if items != identity:
             return False
     return True
 

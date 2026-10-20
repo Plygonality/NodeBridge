@@ -43,6 +43,14 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except (ValueError, KeyError, json.JSONDecodeError, FileNotFoundError) as exc:
+        print(f"nodebridge: {exc}", file=sys.stderr)
+        return 2
+
+
+def _main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "capabilities":
         from .compiler.capabilities import capability_matrix, format_matrix_markdown
@@ -76,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(result.code.code)
     if args.json:
         print(json.dumps(result.report.as_dict(), indent=2, default=str), file=sys.stderr)
-    return 1 if any(d.code.startswith("script.") for d in result.diagnostics.errors) else 0
+    return 1 if result.diagnostics.errors else 0
 
 
 if __name__ == "__main__":

@@ -44,8 +44,19 @@ class CopBuilder:
         value = op.inputs.get(key)
         return self.streams.get((value.op, value.output)) if hasattr(value, "op") else None
 
+    def first_stream(self, op: SemanticOp):
+        """First linked input that already has a COP, whatever its socket is called."""
+        for value in op.inputs.values():
+            if isinstance(value, tuple):
+                value = value[0] if value else None
+            if hasattr(value, "op"):
+                found = self.streams.get((value.op, value.output))
+                if found:
+                    return found
+        return None
+
     def chain(self, op: SemanticOp, var: str, key: str = "image") -> None:
-        source = self.input(op, key)
+        source = self.input(op, key) or self.first_stream(op)
         if source:
             self.w.line(f"{var}.setInput(0, {source})")
         for name in op.outputs:
@@ -168,15 +179,50 @@ def _invert(b: CopBuilder, op: SemanticOp) -> None:
     b.chain(op, var)
 
 
-@_cop("MIX", C.APPROXIMATE, "over / multiply / add COP", "Two-input blend; the factor is not translated.", ("Mix factor is ignored.",))
+_MIX_COP = {
+    "MIX": "blend",
+    "ADD": "add",
+    "SUBTRACT": "subtract",
+    "MULTIPLY": "multiply",
+    "SCREEN": "screen",
+    "LIGHTEN": "max",
+    "DARKEN": "min",
+    "DIVIDE": "divide",
+    "DIFFERENCE": "difference",
+}
+
+
+@_cop("MIX", C.APPROXIMATE, "matching COP2 blend", "Each blend mode uses the COP2 node of the same operation. Unknown modes stay a placeholder.", ("COP2 has no counterpart for every Blender blend mode.",))
 def _mix(b: CopBuilder, op: SemanticOp) -> None:
-    cop_type = {"MULTIPLY": "multiply", "ADD": "add", "SUBTRACT": "subtract"}.get(op.params.get("blend_type"), "over")
+    mode = str(op.params.get("blend_type", "MIX"))
+    cop_type = _MIX_COP.get(mode)
+    if cop_type is None:
+        var = b.node(op, "null")
+        b.chain(op, var, "a")
+        b.note(var, f"Mix mode {mode} has no COP2 counterpart.")
+        return
     var = b.node(op, cop_type)
     first, second = b.input(op, "a"), b.input(op, "b")
     if first:
         b.w.line(f"{var}.setInput(0, {first})")
     if second:
         b.w.line(f"{var}.setInput(1, {second})")
+    factor = op.inputs.get("factor")
+    neutral = isinstance(factor, Const) and factor.value is not None and float(factor.value) == 1.0
+    if mode == "MIX":
+        if isinstance(factor, Const) and factor.value is not None:
+            b.w.line(f'nb_set({var}, "effect", {literal(clean_number(float(factor.value)))})')
+        b.streams[(op.id, "result")] = var
+        return
+    if factor is not None and not neutral:
+        blend = b.node(op, "blend")
+        if first:
+            b.w.line(f"{blend}.setInput(0, {first})")
+        b.w.line(f"{blend}.setInput(1, {var})")
+        if isinstance(factor, Const) and factor.value is not None:
+            b.w.line(f'nb_set({blend}, "effect", {literal(clean_number(float(factor.value)))})')
+        b.streams[(op.id, "result")] = blend
+        return
     b.streams[(op.id, "result")] = var
 
 
