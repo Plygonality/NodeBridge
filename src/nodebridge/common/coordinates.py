@@ -61,8 +61,44 @@ def transpose(m: Mat3) -> Mat3:
     return tuple(tuple(m[j][i] for j in range(3)) for i in range(3))  # type: ignore[return-value]
 
 
+def finite_components(values: Sequence[float] | float, count: int = 3) -> tuple[list[float], bool]:
+    """Replace NaN and Inf per component. ``0 * inf`` must not reach a basis multiply."""
+    items = list(values) if isinstance(values, (list, tuple)) else [values]
+    cleaned: list[float] = []
+    changed = False
+    for item in (items + [0.0] * count)[:count]:
+        try:
+            number = float(item)
+        except (TypeError, ValueError):
+            number = 0.0
+            changed = True
+        else:
+            if not math.isfinite(number):
+                number = 0.0
+                changed = True
+        cleaned.append(number)
+    return cleaned, changed
+
+
+def has_non_finite(value: object) -> bool:
+    items = value if isinstance(value, (list, tuple)) else [value]
+    for item in items:
+        if isinstance(item, (list, tuple)):
+            if has_non_finite(item):
+                return True
+            continue
+        try:
+            number = float(item)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(number):
+            return True
+    return False
+
+
 def apply(m: Mat3, v: Sequence[float]) -> Vec3:
-    return tuple(m[i][0] * v[0] + m[i][1] * v[1] + m[i][2] * v[2] for i in range(3))  # type: ignore[return-value]
+    safe, _ = finite_components(v, 3)
+    return tuple(m[i][0] * safe[0] + m[i][1] * safe[1] + m[i][2] * safe[2] for i in range(3))  # type: ignore[return-value]
 
 
 def det3(m: Mat3) -> float:
@@ -97,8 +133,9 @@ def convert_normal(v: Sequence[float], source: CoordinateSystem = BLENDER, targe
 
 def convert_scale(v: Sequence[float], source: CoordinateSystem = BLENDER, target: CoordinateSystem = HOUDINI) -> Vec3:
     """Scale factors follow the axis permutation but never change sign."""
+    safe, _ = finite_components(v, 3)
     m = change_of_basis(source, target)
-    return _clean(tuple(sum(abs(m[i][k]) * v[k] for k in range(3)) for i in range(3)))  # type: ignore[arg-type]
+    return _clean(tuple(sum(abs(m[i][k]) * safe[k] for k in range(3)) for i in range(3)))  # type: ignore[arg-type]
 
 
 def axis_rotation(axis: str, angle: float) -> Mat3:

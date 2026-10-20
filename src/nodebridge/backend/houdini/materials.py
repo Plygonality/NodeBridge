@@ -11,6 +11,8 @@ from __future__ import annotations
 from typing import Any
 
 from ...backend.codegen import PyWriter, clean_number, literal
+from ...backend.escape import escape
+from ...backend.shader_lower import main_shader_input
 from ...common.names import NameAllocator, houdini_node_name, python_identifier
 from ...ir.semantic import Const, InputValue, Link, Param, SemanticGraph, SemanticOp
 from ...ir.types import DataType
@@ -94,14 +96,33 @@ class MtlxBuilder:
             var, index, _ = self.output(value)
         self.w.line(f'nb_connect({dst}, "{input_name}", {var}, {index})')
 
+    def _relay(self, op: SemanticOp):
+        key = main_shader_input(op)
+        value = op.inputs.get(key) if key else None
+        if isinstance(value, Link):
+            return self.output(value)
+        if isinstance(value, Param):
+            return self.param_node(value.name, COL if self.graph.parameter(value.name) and self.graph.parameter(value.name).data_type == COL else F)
+        if isinstance(value, Const) and value.value is not None:
+            data = COL if isinstance(value.value, (list, tuple)) else F
+            var = self.node(op, "mtlxconstant", "_passthrough", signature=data)
+            self.set(var, "value", self.constant(value.value, data))
+            self.note(var, f"'{op.display_name}' was not translated; its main input is passed through.")
+            return (var, 0, data)
+        return None
+
     def output(self, link: Link) -> tuple[str, int, DataType]:
         op = self.graph.ops[link.op]
         if op.id not in self.cache:
             item = self.backend.translator(op, CTX)
             if item is None or self.result.classification(self.graph, op).confidence == C.UNSUPPORTED or self.result.is_blocked(self.graph, op):
-                var = self.node(op, "mtlxconstant", "_unsupported")
-                self.note(var, f"NodeBridge could not translate '{op.display_name}' ({op.kind}); a constant is used instead.")
-                self.cache[op.id] = {name: (var, 0, ref.base) for name, ref in op.outputs.items()}
+                relayed = self._relay(op)
+                if relayed is not None:
+                    self.cache[op.id] = {name: relayed for name in op.outputs}
+                else:
+                    var = self.node(op, "mtlxconstant", "_unsupported")
+                    self.note(var, f"NodeBridge could not translate '{op.display_name}' ({op.kind}); a constant is used instead.")
+                    self.cache[op.id] = {name: (var, 0, ref.base) for name, ref in op.outputs.items()}
             else:
                 if self.options.include_comments:
                     self.w.comment(f"{op.display_name}: {op.kind} [{self.result.classification(self.graph, op).confidence.value}]")
@@ -116,7 +137,7 @@ def write_material_function(backend, result, w: PyWriter, variables: NameAllocat
     function = python_identifier(f"build_material_{name}")
     w.line(f"def {function}():")
     w.indent()
-    w.line(f'"""Material {name!r} as a MaterialX network in /mat."""')
+    w.line(f'"""Material {escape(name, language="doc")} as a MaterialX network in /mat."""')
     w.line('matnet = hou.node("/mat")')
     builder = MtlxBuilder(backend, result, graph, w, variables)
     outputs = [op for op in graph.ops.values() if op.kind == "MATERIAL_OUTPUT"]
@@ -325,7 +346,11 @@ MATH_MTLX = {
 
 @_mtlx("MATH", C.EXACT, "MaterialX math nodes", "Scalar math maps onto MaterialX arithmetic.", classify=lambda op, g, base: Classification(C.UNSUPPORTED, f"Math {op.params.get('operation')} has no MaterialX mapping here.", "none") if op.params.get("operation") not in MATH_MTLX else None)
 def _math(mb: MtlxBuilder, op: SemanticOp) -> dict:
-    vop, names = MATH_MTLX[op.params["operation"]]
+    found = MATH_MTLX.get(op.params.get("operation"))
+    if found is None:
+        var = mb.node(op, "mtlxconstant", "_unsupported")
+        return {"value": (var, 0, F)}
+    vop, names = found
     var = mb.node(op, vop)
     for name, key in zip(names, "abc"):
         mb.feed(var, name, op.inputs.get(key), F, default=0.0)
@@ -341,7 +366,10 @@ VECTOR_MTLX = {"ADD": "mtlxadd", "SUBTRACT": "mtlxsubtract", "MULTIPLY": "mtlxmu
 
 @_mtlx("VECTOR_MATH", C.EXACT, "MaterialX vector nodes", "Vector math maps onto MaterialX vector3 nodes.", classify=lambda op, g, base: Classification(C.UNSUPPORTED, f"Vector Math {op.params.get('operation')} has no MaterialX mapping here.", "none") if op.params.get("operation") not in VECTOR_MTLX else None)
 def _vector_math(mb: MtlxBuilder, op: SemanticOp) -> dict:
-    operation = op.params["operation"]
+    operation = op.params.get("operation", "ADD")
+    if operation not in VECTOR_MTLX:
+        var = mb.node(op, "mtlxconstant", "_unsupported", signature=V)
+        return {"vector": (var, 0, V), "value": (var, 0, F)}
     var = mb.node(op, VECTOR_MTLX[operation], signature=V)
     if operation in ("NORMALIZE", "LENGTH"):
         mb.feed(var, "in", op.inputs.get("a"), V)
@@ -432,8 +460,35 @@ def _separate(mb: MtlxBuilder, op: SemanticOp) -> dict:
     return {"x": (var, 0, F), "y": (var, 1, F), "z": (var, 2, F)}
 
 
-@_mtlx("COLOR_OPERATION", C.EXACT, "mtlxsubtract (invert)", "Color invert as 1 - color.", classify=lambda op, g, base: Classification(C.UNSUPPORTED, f"Color operation {op.params.get('operation')} is not translated to MaterialX yet.", "none") if op.params.get("operation") != "invert" else None)
+def _color_classify(op, graph, base):
+    operation = op.params.get("operation")
+    if operation == "hue_saturation":
+        return Classification(C.EQUIVALENT, "Hue, saturation and value become MaterialX HSV adjust plus a value multiply.", "mtlxhsvadjust", ["Hue is degrees relative to 0.5; value is a multiply."])
+    if operation != "invert":
+        return Classification(C.UNSUPPORTED, f"Color operation {operation} is not translated to MaterialX yet.", "none")
+    return None
+
+
+def _hue_saturation(mb: MtlxBuilder, op: SemanticOp) -> dict:
+    hsv = mb.node(op, "mtlxhsvadjust", signature=COL)
+    mb.feed(hsv, "in", op.inputs.get("color"), COL, default=(1.0, 1.0, 1.0))
+    hue = op.inputs.get("a")
+    if isinstance(hue, Const) and isinstance(hue.value, (int, float)):
+        mb.set(hsv, "hue", clean_number((float(hue.value) - 0.5) * 360.0))
+    else:
+        mb.feed(hsv, "hue", hue, F, default=0.0)
+    mb.feed(hsv, "saturation", op.inputs.get("b"), F, default=1.0)
+    mb.feed(hsv, "amount", op.inputs.get("factor"), F, default=1.0)
+    mul = mb.node(op, "mtlxmultiply", "_value", signature=COL)
+    mb.w.line(f'nb_connect({mul}, "in1", {hsv}, 0)')
+    mb.feed(mul, "in2", op.inputs.get("c"), F, default=1.0)
+    return {"color": (mul, 0, COL)}
+
+
+@_mtlx("COLOR_OPERATION", C.EXACT, "mtlxsubtract (invert) / mtlxhsvadjust", "Color invert as 1 - color. Hue/Saturation/Value uses MaterialX HSV adjust.", classify=_color_classify)
 def _color_op(mb: MtlxBuilder, op: SemanticOp) -> dict:
+    if op.params.get("operation") == "hue_saturation":
+        return _hue_saturation(mb, op)
     var = mb.node(op, "mtlxsubtract", signature=COL)
     mb.set(var, "in1", (1.0, 1.0, 1.0))
     mb.feed(var, "in2", op.inputs.get("color"), COL)

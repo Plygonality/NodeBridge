@@ -30,10 +30,26 @@ def graph_document_to_dict(document: GraphDocument) -> dict:
 
 
 def graph_document_from_dict(data: dict) -> GraphDocument:
+    if not isinstance(data, dict):
+        raise ValueError("Graph IR document must be a JSON object")
     if data.get("format") != "nodebridge.graph":
         raise ValueError("not a NodeBridge Graph IR document")
-    trees = {tree["name"]: NodeTree.from_dict(tree) for tree in data.get("trees", [])}
-    return GraphDocument(root=data["root"], trees=trees, source=dict(data.get("source", {})))
+    if data.get("format_version") != FORMAT_VERSION:
+        raise ValueError(f"unsupported Graph IR format_version {data.get('format_version')!r}")
+    root = data.get("root")
+    if not isinstance(root, str) or not root:
+        raise ValueError("Graph IR document is missing root")
+    trees: dict[str, NodeTree] = {}
+    duplicates: list[str] = []
+    for tree in data.get("trees", []):
+        name = tree["name"]
+        if name in trees:
+            duplicates.append(name)
+            continue
+        trees[name] = NodeTree.from_dict(tree)
+    if root not in trees:
+        raise ValueError(f"Root tree {root!r} is missing")
+    return GraphDocument(root=root, trees=trees, source=dict(data.get("source", {})), duplicate_trees=duplicates)
 
 
 def dumps_graph(document: GraphDocument) -> str:

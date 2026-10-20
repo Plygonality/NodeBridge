@@ -40,8 +40,10 @@ class PyWriter:
         return self
 
     def comment(self, text: str) -> "PyWriter":
-        for part in text.splitlines() or [""]:
-            self.line(f"# {part}".rstrip())
+        from .escape import escape
+
+        for part in str(text).splitlines() or [""]:
+            self.line(f"# {escape(part, language='comment')}".rstrip())
         return self
 
     def blank(self) -> "PyWriter":

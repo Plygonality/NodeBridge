@@ -16,7 +16,7 @@ from typing import Any
 
 from ...backend.codegen import PyWriter, clean_number, literal
 from ...common.coordinates import blender_euler_to_unreal_rotator, unreal_axis_signs
-from ...common.names import NameAllocator, python_identifier, unreal_asset_name
+from ...common.names import NameAllocator, collapsed_name_warning, python_identifier, unreal_asset_name
 from ...common.units import ValueRole
 from ...compiler.evaluate import NotConstant, evaluate
 from ...ir.semantic import Const, InputValue, Link, SemanticGraph, SemanticOp
@@ -71,7 +71,8 @@ class PcgBuilder:
         self.backend, self.result, self.w = backend, result, w
         self.graph = result.semantic
         self.vars = variables
-        self.expr = PyExpr(self.graph)
+        self.expr = PyExpr(self.graph, result.diagnostics)
+        self._missing_source = False
         self.streams: dict[tuple[str, str], tuple[str, list[str]]] = {}
         self.depth: dict[str, int] = {}
         self.rows: dict[int, int] = {}
@@ -88,7 +89,11 @@ class PcgBuilder:
         return depth * 400, row * 250
 
     def node(self, op: SemanticOp, settings_class: str, suffix: str = "") -> tuple[str, str]:
-        base = python_identifier((op.display_name if self.options.preserve_names else op.kind.lower()) + suffix)
+        raw_name = op.display_name if self.options.preserve_names else op.kind.lower()
+        warning = collapsed_name_warning(raw_name, "node", "Node")
+        if warning and not any(item.code == "name.non_ascii" and item.op == op.id for item in self.result.diagnostics):
+            self.result.diagnostics.warning("name.non_ascii", warning, op=op.id, target=T)
+        base = python_identifier(raw_name + suffix, "node")
         node = self.vars.allocate(base)
         settings = self.vars.allocate(f"{node}_settings")
         x, y = self.position(op)
@@ -107,6 +112,13 @@ class PcgBuilder:
 
     def connect(self, target: str, target_pins: list[str], value: InputValue | None) -> None:
         source = self.stream(value)
+        if source is None and isinstance(value, Link):
+            if not self._missing_source:
+                self._missing_source = True
+                self.w.line("NB_WARNINGS.append('PCG node has no geometry source; connected to the graph Input.')")
+                self.result.diagnostics.warning("unreal.missing_source", "An upstream mesh or points source was not translated; the PCG node is connected to the graph Input.", target=T)
+            self.w.line(f"nb_edge(graph, input_node, ['Out'], {target}, {target_pins!r})")
+            return
         if source is not None:
             self.w.line(f"nb_edge(graph, {source[0]}, {source[1]!r}, {target}, {target_pins!r})")
 
@@ -307,10 +319,18 @@ def _merge(b: PcgBuilder, op: SemanticOp) -> None:
     b.set_output(op, "geometry", node)
 
 
+def _selection_missing(value) -> bool:
+    return value is None or (isinstance(value, Const) and value.value is None)
+
+
 def _mask_classify(op, graph, base):
     selection = op.inputs.get("selection")
+    if _selection_missing(selection):
+        return Classification(C.APPROXIMATE, "No selection was connected; the geometry is kept.", "pass-through")
     if isinstance(selection, Const):
-        return Classification(C.EXACT, "Constant selection.", "pass-through" if not selection.value else "empty")
+        if not selection.value:
+            return Classification(C.EXACT, "Constant false selection.", "pass-through")
+        return Classification(C.EQUIVALENT, "Constant true selection removes every point.", "empty point set")
     mask = graph.resolve(selection)
     if mask is None or mask.kind != "SPATIAL_NOISE_MASK":
         return Classification(C.UNSUPPORTED, "Only noise-based selections are translated to PCG (Spatial Noise + Density Filter).", "none")
@@ -340,9 +360,16 @@ def _separate(b: PcgBuilder, op: SemanticOp) -> None:
 
 def _density_filter(b: PcgBuilder, op: SemanticOp, stream: InputValue | None, *, invert: bool, output: str) -> None:
     selection = op.inputs.get("selection")
+    if _selection_missing(selection):
+        b.result.diagnostics.warning("delete.missing_selection", f"{op.display_name} has no Selection input; the geometry is kept.", op=op.id, target=T)
+        b.passthrough(op, output, stream)
+        return
     if isinstance(selection, Const):
         if not selection.value:
             b.passthrough(op, output, stream)
+            return
+        node, _settings = b.node(op, "PCGCreatePointsSettings", f"_{output}_empty")
+        b.set_output(op, output, node)
         return
     mask = b.graph.resolve(selection)
     noise, noise_settings = b.node(op, "PCGSpatialNoiseSettings", "_noise")

@@ -121,6 +121,7 @@ def nb_spawner_mesh(settings, mesh_path, material=None):
 def build():
     factory_class = getattr(unreal, "PCGGraphFactory", None)
     graph = nb_create_asset("PCG_BuildingGenerator", ASSET_PATH, unreal.PCGGraph, factory_class() if factory_class else None)
+    input_node = graph.get_input_node()
     output_node = graph.get_output_node()
 
     # Window Panel: PRIMITIVE [APPROXIMATE] -> Engine basic shape  (Blender: GeometryNodeMeshCube)
@@ -145,6 +146,8 @@ def build():
 
     # Window Positions: SCATTER [APPROXIMATE] -> PCGSurfaceSamplerSettings  (Blender: GeometryNodeDistributePointsOnFaces)
     window_positions, window_positions_settings = nb_pcg_node(graph, "PCGSurfaceSamplerSettings", 2000, 0)
+    NB_WARNINGS.append('PCG node has no geometry source; connected to the graph Input.')
+    nb_edge(graph, input_node, ['Out'], window_positions, ['Surface', 'In'])
     nb_prop(window_positions_settings, "points_per_squared_meter", WINDOW_DENSITY)
     nb_prop(window_positions_settings, "seed", int(SEED))
 

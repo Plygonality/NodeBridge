@@ -14,10 +14,12 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from ...common.names import NameAllocator, python_identifier
+from ...common.names import NameAllocator, collapsed_name_warning, python_identifier
 from ...common.units import ValueRole
+from ...compiler.limits import MAX_GROUP_DEPTH
 from ...compiler.analyzer import analyze_tree
 from ...compiler.diagnostics import DiagnosticBag
+from ...compiler.limits import MAX_GROUP_DEPTH
 from ...compiler.normalize import normalize_tree
 from ...ir.graph import GraphDocument, GraphEdge, GraphNode, InterfaceSocket, NodeTree, TreeKind
 from ...ir.operations import Category, get_operation
@@ -364,21 +366,27 @@ class BlenderLifter:
 
     def lift(self) -> SemanticGraph:
         graph = self.lift_tree(self.document.root, is_subgraph=False)
+        if graph is None:
+            graph = SemanticGraph(name=self.document.root or "invalid", kind=TreeKind.GEOMETRY, source=dict(self.document.source))
         graph.source = dict(self.document.source)
         return graph
 
-    def lift_tree(self, name: str, *, is_subgraph: bool) -> SemanticGraph:
+    def lift_tree(self, name: str, *, is_subgraph: bool) -> SemanticGraph | None:
         cache_key = f"{name}::{'sub' if is_subgraph else 'root'}"
-        if cache_key in self._cache:
+        if cache_key in self._cache and name not in self._stack:
             return self._cache[cache_key]
         if name in self._stack:
-            raise LiftError(f"recursive node group {name!r}")
+            self.diagnostics.error("graph.recursive_group", f"Node group {name!r} references itself.", tree=name)
+            return None
+        if len(self._stack) >= MAX_GROUP_DEPTH:
+            self.diagnostics.error("graph.depth", f"Node group nesting exceeded {MAX_GROUP_DEPTH} levels.", tree=name)
+            return None
         self._stack.append(name)
         try:
             tree = normalize_tree(self.document.trees[name], self.diagnostics)
             self.normalized[name] = tree
             graph = SemanticGraph(name=name, kind=tree.kind, is_subgraph=is_subgraph, source=dict(tree.metadata))
-            graph.parameters = _parameters_from_interface(tree.inputs)
+            graph.parameters = _parameters_from_interface(tree.inputs, self.diagnostics)
             ctx = LiftContext(self, tree, graph)
             analysis = analyze_tree(tree)
             for cycle in analysis.cycles:
@@ -402,6 +410,9 @@ class BlenderLifter:
                 ctx.unsupported(node, f"Node group {node.group_tree!r} was not found.")
                 return
             sub = self.lift_tree(node.group_tree, is_subgraph=True)
+            if sub is None:
+                ctx.unsupported(node, f"Node group {node.group_tree!r} was not expanded.")
+                return
             ctx.graph.subgraphs[sub.name] = sub
             ctx.lift_group_node(node, sub)
             return
@@ -415,12 +426,15 @@ class BlenderLifter:
             ctx.unsupported(node, str(exc))
 
 
-def _parameters_from_interface(inputs: list[InterfaceSocket]) -> list[ExposedParameter]:
+def _parameters_from_interface(inputs: list[InterfaceSocket], diagnostics: DiagnosticBag | None = None) -> list[ExposedParameter]:
     names = NameAllocator()
     result: list[ExposedParameter] = []
     for socket in inputs:
         if socket.data_type in NON_PARAMETER_TYPES:
             continue
+        warning = collapsed_name_warning(socket.name, "parameter", "Parameter")
+        if warning and diagnostics is not None:
+            diagnostics.warning("name.non_ascii", warning)
         result.append(
             ExposedParameter(
                 key=names.allocate(python_identifier(socket.name, "parameter")),

@@ -16,7 +16,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from ...backend.codegen import clean_number
+from ...backend.escape import escape
 from ...common.units import ValueRole
+from ...compiler.limits import MAX_EXPRESSION_DEPTH, note_depth
 from ...ir.semantic import Const, InputValue, Link, Param, SemanticOp
 from ...ir.types import DataType
 from ...translation.confidence import Classification, Confidence as C
@@ -93,6 +95,7 @@ class VexCompiler:
         self._counter = 0
         self.notes: list[str] = []
         self.sources: list[str] = []
+        self._depth = 0
 
     # -- infrastructure ------------------------------------------------
     @property
@@ -156,6 +159,16 @@ class VexCompiler:
         return f'chf("{path}")'
 
     def output(self, link: Link) -> tuple[str, DataType]:
+        self._depth += 1
+        try:
+            if self._depth > MAX_EXPRESSION_DEPTH:
+                note_depth(self.b.result.diagnostics, "compiler.depth", f"Expression nesting exceeded {MAX_EXPRESSION_DEPTH}; zero is used.")
+                return ("0.0", DataType.FLOAT)
+            return self._output(link)
+        finally:
+            self._depth -= 1
+
+    def _output(self, link: Link) -> tuple[str, DataType]:
         op = self.graph.ops[link.op]
         if op.id not in self._cache:
             self._cache[op.id] = self.emit(op)
@@ -169,9 +182,16 @@ class VexCompiler:
         if reader is not None:
             return reader(self, op)
         item = self.b.backend.translator(op, CTX)
-        if item is None or op.kind == "UNSUPPORTED_OPERATION":
+        classification = None
+        try:
+            classification = self.b.classification(op)
+        except KeyError:
+            classification = None
+        if item is None or op.kind == "UNSUPPORTED_OPERATION" or (classification is not None and classification.confidence == C.UNSUPPORTED):
             self.notes.append(f"{op.display_name}: no VEX translation; zero is used instead.")
-            self.stmt(f"// UNSUPPORTED: {op.display_name} ({op.kind}) -> zero")
+            self.stmt(f"// UNSUPPORTED: {escape(op.display_name, language='comment')} ({op.kind}) -> zero")
+            if not any(item.code == "compiler.unsupported_operation" and item.op == op.id for item in self.b.result.diagnostics):
+                self.b.result.diagnostics.warning("compiler.unsupported_operation", f"{op.display_name} ({op.kind}) is not translated; zero is used.", op=op.id, target="houdini")
             return {name: (vex_literal(0.0, ref.base), ref.base) for name, ref in op.outputs.items()}
         result = item.fn(self, op)
         self.sources.append(op.display_name)
@@ -180,7 +200,7 @@ class VexCompiler:
     def parts(self, body: list[str]) -> tuple[list[str], str]:
         """(library names in dependency order, snippet body)."""
         libraries = [name for name in ORDER if name in self.libraries]
-        header = [f"// Blender fields: {', '.join(dict.fromkeys(self.sources))}"] if self.sources else []
+        header = [f"// Blender fields: {', '.join(escape(name, language='comment') for name in dict.fromkeys(self.sources))}"] if self.sources else []
         return libraries, "\n".join(header + self.lines + body).rstrip() + "\n"
 
     def snippet(self, body: list[str]) -> str:
@@ -393,7 +413,7 @@ MATH_VEX = {
     "COMPARE": "(abs({a} - {b}) <= max({c}, 1e-5) ? 1.0 : 0.0)",
     "SMOOTH_MIN": "({c} != 0 ? min({a}, {b}) - pow(max({c} - abs({a} - {b}), 0.0) / {c}, 3) * {c} / 6.0 : min({a}, {b}))",
     "SMOOTH_MAX": "({c} != 0 ? max({a}, {b}) + pow(max({c} - abs({a} - {b}), 0.0) / {c}, 3) * {c} / 6.0 : max({a}, {b}))",
-    "ROUND": "floor({a} + 0.5)",
+    "ROUND": "({a} < 0 ? -floor(-({a}) + 0.5) : floor({a} + 0.5))",
     "FLOOR": "floor({a})",
     "CEIL": "ceil({a})",
     "TRUNC": "trunc({a})",
@@ -473,7 +493,10 @@ def _vector_math_classify(op, graph, base):
 
 @translator("VECTOR_MATH", target=T, context=CTX, confidence=C.EXACT, implementation="VEX vector math", explanation="Vector operations reproduced in VEX.", classify=_vector_math_classify)
 def _vector_math(vc: VexCompiler, op: SemanticOp):
-    kind, template = VECTOR_VEX[op.params.get("operation", "ADD")]
+    found = VECTOR_VEX.get(op.params.get("operation", "ADD"))
+    if found is None:
+        return {"vector": ("set(0.0, 0.0, 0.0)", V), "value": ("0.0", F)}
+    kind, template = found
     if "nb_safe_div3" in template:
         vc.need("safe")
     args = {k: vc.tmp("nb_vec", V, _v(vc, op, k, V, 0.0)) for k in "abc" if "{" + k + "}" in template}
@@ -528,10 +551,19 @@ BOOLEAN_VEX = {
 }
 
 
-@translator("BOOLEAN_MATH", target=T, context=CTX, confidence=C.EXACT, implementation="VEX logic", explanation="Boolean logic reproduced in VEX.")
+def _boolean_classify(op, graph, base):
+    if op.params.get("operation", "AND") not in BOOLEAN_VEX:
+        return Classification(C.UNSUPPORTED, f"Boolean operation {op.params.get('operation')} is not translated.", "none")
+    return None
+
+
+@translator("BOOLEAN_MATH", target=T, context=CTX, confidence=C.EXACT, implementation="VEX logic", explanation="Boolean logic reproduced in VEX.", classify=_boolean_classify)
 def _boolean_math(vc: VexCompiler, op: SemanticOp):
+    template = BOOLEAN_VEX.get(op.params.get("operation", "AND"))
+    if template is None:
+        return {"value": ("0", B)}
     a, b = vc.tmp("nb_ba", B, _v(vc, op, "a", B, 0)), _v(vc, op, "b", B, 0)
-    return {"value": (BOOLEAN_VEX[op.params.get("operation", "AND")].format(a=a, b=b), B)}
+    return {"value": (template.format(a=a, b=b), B)}
 
 
 @translator("COMBINE_VECTOR", target=T, context=CTX, confidence=C.EXACT, implementation="VEX set()", explanation="Vector construction.")

@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ...backend.codegen import clean_number
+from ...compiler.limits import MAX_EXPRESSION_DEPTH, note_depth
 from ...common.names import houdini_parm_name
 from ...common.units import ValueRole
 from ...ir.semantic import Const, InputValue, Link, Param
@@ -32,7 +33,7 @@ MATH = {
     "ABSOLUTE": "abs({a})",
     "FLOOR": "floor({a})",
     "CEIL": "ceil({a})",
-    "ROUND": "floor({a} + 0.5)",
+    "ROUND": "({a} < 0 ? -floor(-({a}) + 0.5) : floor({a} + 0.5))",
     "SQRT": "sqrt({a})",
     "RADIANS": "rad({a})",
     "DEGREES": "deg({a})",
@@ -48,9 +49,20 @@ def number(value) -> str:
 class HScriptCompiler:
     def __init__(self, builder: "SopBuilder") -> None:
         self.b = builder
+        self._depth = 0
 
     def components(self, value: InputValue | None, count: int) -> list[str] | None:
         """Blender-frame expression per component, or ``None`` if not expressible."""
+        self._depth += 1
+        try:
+            if self._depth > MAX_EXPRESSION_DEPTH:
+                note_depth(self.b.result.diagnostics, "compiler.depth", f"Expression nesting exceeded {MAX_EXPRESSION_DEPTH}; the current value was baked.")
+                return None
+            return self._components(value, count)
+        finally:
+            self._depth -= 1
+
+    def _components(self, value: InputValue | None, count: int) -> list[str] | None:
         if value is None:
             return None
         if isinstance(value, Const):
@@ -145,8 +157,10 @@ class HScriptCompiler:
         return None
 
 
-def to_houdini_components(components: list[str], role: ValueRole) -> list[str]:
+def to_houdini_components(components: list[str], role: ValueRole, *, scene_scale: float = 1.0) -> list[str]:
     """Blender-frame component expressions -> Houdini-frame expressions."""
+    if scene_scale != 1.0 and role in (ValueRole.POSITION, ValueRole.DIRECTION, ValueRole.NORMAL, ValueRole.LENGTH):
+        components = [f"(({item}) * {scene_scale})" for item in components]
     if len(components) != 3:
         if role == ValueRole.ANGLE:
             return [f"deg({components[0]})"]

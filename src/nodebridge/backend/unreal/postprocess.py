@@ -94,7 +94,9 @@ def _glare(b: PostProcessBuilder, op: SemanticOp) -> None:
 def _balance(b: PostProcessBuilder, op: SemanticOp) -> None:
     b.setting("color_gain", b.vector4(b.const(op, "gain", [1, 1, 1])))
     b.setting("color_gamma", b.vector4(b.const(op, "gamma", [1, 1, 1])))
-    lift = [float(v) - 1.0 for v in list(b.const(op, "lift", [1, 1, 1]))[:3]]
+    lift = [float(v) for v in list(b.const(op, "lift", [1, 1, 1]))[:3]]
+    if not op.params.get("lift_additive"):
+        lift = [v - 1.0 for v in lift]
     b.setting("color_offset", b.vector4(lift, 0.0))
 
 

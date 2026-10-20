@@ -12,6 +12,22 @@ from typing import Any, Callable
 
 from ..ir.semantic import Const, InputValue, Link, Param, SemanticGraph
 from ..ir.types import DataType, convert_value
+from .limits import MAX_EXPRESSION_DEPTH
+
+
+def _round_half_away(value: float) -> float:
+    """Half away from zero. ``ROUND(-1.5)`` is ``-2.0``."""
+    return math.copysign(math.floor(abs(value) + 0.5), value)
+
+
+def _f(value: Any, default: float = 0.0) -> float:
+    """Numeric coercion. ``None`` and non-numeric defaults become ``default`` instead of raising."""
+    if value is None:
+        return float(default)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
 
 
 def _safe_div(a: float, b: float) -> float:
@@ -56,7 +72,7 @@ MATH: dict[str, Callable[..., float]] = {
     "COMPARE": lambda a, b, c: 1.0 if abs(a - b) <= max(c, 1e-5) else 0.0,
     "SMOOTH_MIN": lambda a, b, c: min(a, b) if c == 0 else min(a, b) - (max(c - abs(a - b), 0.0) / c) ** 3 * c / 6.0,
     "SMOOTH_MAX": lambda a, b, c: max(a, b) if c == 0 else max(a, b) + (max(c - abs(a - b), 0.0) / c) ** 3 * c / 6.0,
-    "ROUND": lambda a, b, c: math.floor(a + 0.5),
+    "ROUND": lambda a, b, c: _round_half_away(a),
     "FLOOR": lambda a, b, c: math.floor(a),
     "CEIL": lambda a, b, c: math.ceil(a),
     "TRUNC": lambda a, b, c: float(math.trunc(a)),
@@ -84,7 +100,11 @@ MATH: dict[str, Callable[..., float]] = {
 
 
 def _v(x) -> list[float]:
-    return [float(i) for i in convert_value(x, DataType.ANY, DataType.VECTOR3)]
+    try:
+        items = convert_value(x, DataType.ANY, DataType.VECTOR3)
+        return [_f(i) for i in items]
+    except (TypeError, ValueError):
+        return [0.0, 0.0, 0.0]
 
 
 def _length(v) -> float:
@@ -153,8 +173,10 @@ class NotConstant(Exception):
     pass
 
 
-def evaluate(graph: SemanticGraph, value: InputValue | None, *, params: dict[str, Any] | None = None, default: Any = None) -> Any:
+def evaluate(graph: SemanticGraph, value: InputValue | None, *, params: dict[str, Any] | None = None, default: Any = None, _depth: int = 0) -> Any:
     """Evaluate a single-value expression. Parameters use ``params`` or their current values."""
+    if _depth > MAX_EXPRESSION_DEPTH:
+        raise NotConstant("expression depth")
     if value is None:
         return default
     if isinstance(value, Const):
@@ -168,22 +190,22 @@ def evaluate(graph: SemanticGraph, value: InputValue | None, *, params: dict[str
         return parameter.current
     if isinstance(value, Link):
         op = graph.ops[value.op]
-        result = evaluate_op(graph, op, params)
+        result = evaluate_op(graph, op, params, _depth=_depth + 1)
         if value.output not in result:
             raise NotConstant(f"{op.kind}.{value.output}")
         return result[value.output]
     raise NotConstant(repr(value))
 
 
-def evaluate_op(graph: SemanticGraph, op, params: dict[str, Any] | None = None) -> dict[str, Any]:
+def evaluate_op(graph: SemanticGraph, op, params: dict[str, Any] | None = None, *, _depth: int = 0) -> dict[str, Any]:
     def arg(name: str, default: Any = 0.0) -> Any:
-        return evaluate(graph, op.inputs.get(name), params=params, default=default)
+        return evaluate(graph, op.inputs.get(name), params=params, default=default, _depth=_depth + 1)
 
     if op.kind == "MATH":
         fn = MATH.get(op.params.get("operation", "ADD"))
         if fn is None:
             raise NotConstant(op.params.get("operation"))
-        result = fn(float(arg("a")), float(arg("b")), float(arg("c")))
+        result = fn(_f(arg("a")), _f(arg("b")), _f(arg("c")))
         if op.params.get("clamp"):
             result = min(max(result, 0.0), 1.0)
         if op.outputs.get("value") is not None and op.outputs["value"].base == DataType.INT:
@@ -193,10 +215,10 @@ def evaluate_op(graph: SemanticGraph, op, params: dict[str, Any] | None = None) 
         fn = VECTOR_MATH.get(op.params.get("operation", "ADD"))
         if fn is None:
             raise NotConstant(op.params.get("operation"))
-        vector, scalar = fn(_v(arg("a", [0.0] * 3)), _v(arg("b", [0.0] * 3)), _v(arg("c", [0.0] * 3)), float(arg("scale", 1.0)))
+        vector, scalar = fn(_v(arg("a", [0.0] * 3)), _v(arg("b", [0.0] * 3)), _v(arg("c", [0.0] * 3)), _f(arg("scale", 1.0), 1.0))
         return {"vector": vector if vector is not None else [0.0, 0.0, 0.0], "value": scalar if scalar is not None else 0.0}
     if op.kind == "COMBINE_VECTOR":
-        return {"vector": [float(arg("x")), float(arg("y")), float(arg("z"))]}
+        return {"vector": [_f(arg("x")), _f(arg("y")), _f(arg("z"))]}
     if op.kind == "SEPARATE_VECTOR":
         v = _v(arg("vector", [0.0] * 3))
         return {"x": v[0], "y": v[1], "z": v[2]}
@@ -204,12 +226,14 @@ def evaluate_op(graph: SemanticGraph, op, params: dict[str, Any] | None = None) 
         fn = COMPARE.get(op.params.get("operation", "GREATER_THAN"))
         if fn is None:
             raise NotConstant(op.params.get("operation"))
-        return {"result": fn(float(arg("a")), float(arg("b")), float(arg("epsilon", 0.001)))}
+        return {"result": fn(_f(arg("a")), _f(arg("b")), _f(arg("epsilon", 0.001), 0.001))}
     if op.kind == "BOOLEAN_MATH":
-        fn = BOOLEAN[op.params.get("operation", "AND")]
+        fn = BOOLEAN.get(op.params.get("operation", "AND"))
+        if fn is None:
+            raise NotConstant(op.params.get("operation"))
         return {"value": fn(bool(arg("a", False)), bool(arg("b", False)))}
     if op.kind == "MAP_RANGE" and op.params.get("data_type", "FLOAT") == "FLOAT" and op.params.get("interpolation", "LINEAR") == "LINEAR":
-        value, fmin, fmax, tmin, tmax = (float(arg(k, d)) for k, d in (("value", 1.0), ("from_min", 0.0), ("from_max", 1.0), ("to_min", 0.0), ("to_max", 1.0)))
+        value, fmin, fmax, tmin, tmax = (_f(arg(k, d), d) for k, d in (("value", 1.0), ("from_min", 0.0), ("from_max", 1.0), ("to_min", 0.0), ("to_max", 1.0)))
         t = _safe_div(value - fmin, fmax - fmin)
         if op.params.get("clamp", True):
             t = min(max(t, 0.0), 1.0)

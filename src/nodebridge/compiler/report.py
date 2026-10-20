@@ -77,9 +77,20 @@ class TranslationReport:
             reason = c.limitations[0] if c.limitations else c.explanation
             result.append(f"{entry.name} | {c.confidence.label} | {reason}")
         for d in self.diagnostics:
+            if d.code in ("graph.dead_node", "graph.muted_node"):
+                result.append(f"Note | {d.message}")
+                continue
             if d.severity in (Severity.WARNING, Severity.ERROR) and not d.code.startswith("lift.unsupported"):
                 result.append(f"{d.severity.value.title()} | {d.message}")
         return result
+
+    def ui_warnings(self, limit: int = 40) -> list[str]:
+        """Sidebar lines. Past ``limit``, one line says how many notes were left out."""
+        lines = self.warnings()
+        if len(lines) <= limit:
+            return lines
+        omitted = len(lines) - limit
+        return lines[:limit] + [f"{omitted} notes omitted past {limit}"]
 
     def as_dict(self) -> dict:
         return {

@@ -398,10 +398,11 @@ def _build_compositor_nodes(tree, *, group_output):
     if color_gain is not None and color_lift is not None:
         color_gain.default_value = (1.05, 1.0, 0.92, 1.0)
         color_lift.default_value = (0.98, 1.0, 1.04, 1.0)
-        # 5.2 multiplies Base Lift (default 0) by Color Lift. Keep the color.
+        # 5.x Base Lift is additive and neutral at 0. Leaving the default (0)
+        # keeps Color Lift as a pure offset.
         base_lift = next((s for s in grade.inputs if s.identifier == "Base Lift"), None)
         if base_lift is not None:
-            base_lift.default_value = 1.0
+            base_lift.default_value = 0.0
     else:
         grade.gain = (1.05, 1.0, 0.92)
         grade.lift = (0.98, 1.0, 1.04)

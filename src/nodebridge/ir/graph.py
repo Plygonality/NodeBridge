@@ -292,6 +292,7 @@ class GraphDocument:
     root: str
     trees: dict[str, NodeTree] = field(default_factory=dict)
     source: dict[str, Any] = field(default_factory=dict)
+    duplicate_trees: list[str] = field(default_factory=list)
 
     @property
     def root_tree(self) -> NodeTree:
