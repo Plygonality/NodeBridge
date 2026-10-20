@@ -161,8 +161,14 @@ def _hsv(b: CopBuilder, op: SemanticOp) -> None:
 def _balance(b: CopBuilder, op: SemanticOp) -> None:
     var = b.node(op, "colorcorrect")
     for key in ("lift", "gamma", "gain"):
-        value = b.const(op, key, [1.0, 1.0, 1.0])
-        b.w.line(f'nb_set({var}, "{key}", {literal(tuple(clean_number(float(v)) for v in list(value)[:3]))})')
+        value = [float(v) for v in list(b.const(op, key, [1.0, 1.0, 1.0]))[:3]]
+        if key == "lift" and op.params.get("lift_additive"):
+            # Blender 5.x stores lift as the Unreal offset base_lift + (color_lift - 1).
+            # Assumption, not checked in a live Houdini session: COP2 colorcorrect lift
+            # matches Blender's combined lift (base_lift + color_lift), neutral at 1.
+            # That is the same number the 4.x path already writes, which is offset + 1.
+            value = [v + 1.0 for v in value]
+        b.w.line(f'nb_set({var}, "{key}", {literal(tuple(clean_number(v) for v in value))})')
     b.chain(op, var)
 
 
