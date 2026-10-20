@@ -45,9 +45,16 @@ NodeBridge does **not** promise vertex-identical or pixel-identical results betw
 
 Requirements: **Blender 4.2 LTS or newer** (tested on 4.2 LTS, 4.5 LTS, and 5.2 LTS). No other dependencies.
 
-1. Get the add-on zip:
-   * download `nodebridge-0.3.0.zip` from the repository's releases, **or**
-   * build it from a checkout with `python tools/build_addon.py`, which writes `dist/nodebridge-0.3.0.zip` (Blender is not needed for the build).
+1. Build the add-on zip from a checkout. Blender is not required for the build:
+
+   ```bash
+   python tools/build_addon.py
+   ```
+
+   This writes `dist/nodebridge-0.3.0.zip`.
+
+   The same zip is checked in at [`release/nodebridge-0.3.0.zip`](release/nodebridge-0.3.0.zip). CI builds it and uploads it as the `nodebridge-addon` artifact.
+
 2. In Blender, open **Edit > Preferences > Get Extensions**.
 3. Click the **⌄** menu in the top-right corner and choose **Install from Disk…**
 4. Select `nodebridge-0.3.0.zip`. NodeBridge is installed and enabled.
