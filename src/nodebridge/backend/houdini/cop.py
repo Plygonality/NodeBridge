@@ -1,13 +1,16 @@
 """Compositor -> Houdini COP2 network in ``/img``.
 
-COP2 has meaningful counterparts for blur, brightness, gamma, HSV and
-color correction. Glare and vignettes have no single COP2 node and are
-reported. Houdini 20.5's Copernicus context is not targeted yet.
-Parameter names below follow COP2 conventions but have not been
+COP2 has no Glare node. Bright pixels are keyed, brightened, blurred and
+composited, which is the glow recipe in SideFX's compositing docs. An
+ellipse mask is a Shape COP (circle, scaled into an ellipse). A vignette
+is that mask, blurred, and multiplied over the image. Copernicus is not
+targeted yet. Parameter names follow COP2 conventions but have not been
 verified against a live Houdini session; ``nb_set`` reports mismatches.
 """
 
 from __future__ import annotations
+
+import math
 
 from ...backend.codegen import PyWriter, clean_number, literal
 from ...common.names import NameAllocator, houdini_node_name, python_identifier
@@ -27,11 +30,15 @@ class CopBuilder:
         self.names = NameAllocator()
         self.streams: dict[tuple[str, str], str] = {}
 
-    def node(self, op: SemanticOp, cop_type: str) -> str:
-        hname = self.names.allocate(houdini_node_name(op.display_name))
+    def node(self, op: SemanticOp, cop_type: str, suffix: str = "") -> str:
+        label = op.display_name if not suffix else f"{op.display_name}_{suffix}"
+        hname = self.names.allocate(houdini_node_name(label))
         var = self.vars.allocate(python_identifier(hname))
         self.w.line(f'{var} = nb_create(net, "{cop_type}", "{hname}")')
         return var
+
+    def menu(self, var: str, parm: str, token: str) -> None:
+        self.w.line(f'nb_set_menu({var}, "{parm}", "{token}")')
 
     def input(self, op: SemanticOp, key: str = "image"):
         value = op.inputs.get(key)
@@ -171,3 +178,99 @@ def _mix(b: CopBuilder, op: SemanticOp) -> None:
     if second:
         b.w.line(f"{var}.setInput(1, {second})")
     b.streams[(op.id, "result")] = var
+
+
+def _pair(value, default: tuple[float, float]) -> tuple[float, float]:
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        return float(value[0]), float(value[1])
+    if isinstance(value, (int, float)):
+        return float(value), float(value)
+    return default
+
+
+@_cop(
+    "GLARE",
+    C.APPROXIMATE,
+    "lumakey + bright + blur + over",
+    "COP2 has no Glare node. Bright pixels are keyed, brightened, blurred, and composited over the image (SideFX glow recipe).",
+    ("Streaks, ghosts, and fog glow all become the same soft glow.", "Glare quality is not translated."),
+)
+def _glare(b: CopBuilder, op: SemanticOp) -> None:
+    source = b.input(op, "image")
+    key = b.node(op, "lumakey", "key")
+    if source:
+        b.w.line(f"{key}.setInput(0, {source})")
+    threshold = float(b.const(op, "threshold", 1.0))
+    b.w.line(f'nb_set({key}, "domin", 1)')
+    b.w.line(f'nb_set({key}, "minlum", {literal(clean_number(threshold))})')
+    bright = b.node(op, "bright", "gain")
+    b.w.line(f"{bright}.setInput(0, {key})")
+    strength = float(b.const(op, "strength", 1.0))
+    b.w.line(f'nb_set({bright}, "bright", {literal(clean_number(1.0 + max(strength, 0.0)))})')
+    blur = b.node(op, "blur", "spread")
+    b.w.line(f"{blur}.setInput(0, {bright})")
+    size = _pair(b.const(op, "size", 8), (8.0, 8.0))
+    b.w.line(f'nb_set({blur}, "size", {literal(clean_number(max(size)))})')
+    over = b.node(op, "over", "glow")
+    if source:
+        b.w.line(f"{over}.setInput(0, {source})")
+    b.w.line(f"{over}.setInput(1, {blur})")
+    for name in op.outputs:
+        b.streams[(op.id, name)] = over
+    b.note(over, "Approximate glow. Streaks, ghosts and fog glow are not reproduced.")
+
+
+@_cop(
+    "ELLIPSE_MASK",
+    C.APPROXIMATE,
+    "shape COP (circle)",
+    "An elliptical mask is a Shape COP circle, scaled and moved in UV.",
+    ("Shape COP draws a circle scaled into an ellipse, not a true analytic ellipse.",),
+)
+def _ellipse(b: CopBuilder, op: SemanticOp) -> None:
+    var = b.node(op, "shape")
+    b.menu(var, "shapetype", "circle")
+    width, height = _pair(b.const(op, "size", [0.2, 0.1]), (0.2, 0.1))
+    x, y = _pair(b.const(op, "position", [0.5, 0.5]), (0.5, 0.5))
+    b.w.line(f'nb_set({var}, "sx", {literal(clean_number(width))})')
+    b.w.line(f'nb_set({var}, "sy", {literal(clean_number(height))})')
+    b.w.line(f'nb_set({var}, "tx", {literal(clean_number(x - 0.5))})')
+    b.w.line(f'nb_set({var}, "ty", {literal(clean_number(y - 0.5))})')
+    b.w.line(f'nb_set({var}, "rz", {literal(clean_number(math.degrees(float(b.const(op, "rotation", 0.0)))))})')
+    for name in op.outputs:
+        b.streams[(op.id, name)] = var
+    b.note(var, "Ellipse mask as a scaled circle. Outside the shape stays black.")
+
+
+@_cop(
+    "VIGNETTE",
+    C.APPROXIMATE,
+    "shape + blur + multiply",
+    "Ellipse mask, blur and multiply become a circle, a blur, and a multiply over the image.",
+    ("The falloff is a blurred circle, not a lens vignette profile.",),
+)
+def _vignette(b: CopBuilder, op: SemanticOp) -> None:
+    source = b.input(op, "image")
+    shape = b.node(op, "shape", "mask")
+    b.menu(shape, "shapetype", "circle")
+    width, height = _pair(b.const(op, "size", [0.5, 0.5]), (0.5, 0.5))
+    b.w.line(f'nb_set({shape}, "sx", {literal(clean_number(width))})')
+    b.w.line(f'nb_set({shape}, "sy", {literal(clean_number(height))})')
+    blur = b.node(op, "blur", "falloff")
+    b.w.line(f"{blur}.setInput(0, {shape})")
+    soft_x, soft_y = _pair(b.const(op, "softness", [0.0, 0.0]), (0.0, 0.0))
+    b.w.line(f'nb_set({blur}, "size", {literal(clean_number(max(soft_x, soft_y, 0.0)))})')
+    mask = blur
+    intensity = float(b.const(op, "intensity", 1.0))
+    if abs(intensity - 1.0) > 1e-6:
+        amount = b.node(op, "bright", "amount")
+        b.w.line(f"{amount}.setInput(0, {blur})")
+        b.w.line(f'nb_set({amount}, "bright", {literal(clean_number(intensity))})')
+        mask = amount
+    mult = b.node(op, "multiply")
+    if source:
+        b.w.line(f"{mult}.setInput(0, {source})")
+    b.w.line(f"{mult}.setInput(1, {mask})")
+    for name in op.outputs:
+        b.streams[(op.id, name)] = mult
+    b.note(mult, "Vignette: blurred circular mask multiplied over the image.")

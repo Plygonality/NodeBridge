@@ -12,16 +12,16 @@ confidence for specific configurations (see the translation report).
 | `COLOR_CORRECTION` | compositor | unsupported | approximate (postprocess: Color grading saturation / contrast / gamma / gain) |
 | `COMPOSITE_OUTPUT` | compositor | equivalent (cop2: null OUT (display)) | equivalent (postprocess: unbound Post Process Volume) |
 | `COMPOSITOR_OPERATION` | compositor | unsupported | unsupported |
-| `ELLIPSE_MASK` | compositor | unsupported | unsupported |
+| `ELLIPSE_MASK` | compositor | approximate (cop2: shape COP (circle)) | unsupported |
 | `EXPOSURE` | compositor | exact (cop2: bright COP) | equivalent (postprocess: Exposure compensation) |
 | `GAMMA` | compositor | exact (cop2: gamma COP) | equivalent (postprocess: Color gamma) |
-| `GLARE` | compositor | unsupported | approximate (postprocess: Bloom intensity / threshold) |
+| `GLARE` | compositor | approximate (cop2: lumakey + bright + blur + over) | approximate (postprocess: Bloom intensity / threshold) |
 | `HUE_SATURATION` | compositor | equivalent (cop2: hsv COP) | approximate (postprocess: Color saturation) |
 | `IMAGE_INPUT` | compositor | equivalent (cop2: file COP) | unsupported |
 | `INVERT` | compositor | exact (cop2: invert COP) | unsupported |
 | `LENS_DISTORTION` | compositor | unsupported | approximate (postprocess: Chromatic aberration) |
 | `RENDER_LAYER` | compositor | approximate (cop2: file COP) | equivalent (postprocess: rendered scene) |
-| `VIGNETTE` | compositor | unsupported | approximate (postprocess: Vignette intensity) |
+| `VIGNETTE` | compositor | approximate (cop2: shape + blur + multiply) | approximate (postprocess: Vignette intensity) |
 | `ALIGN_ROTATION` | field | equivalent (sop: VEX dihedral()) | unsupported (pcg: none) |
 | `ATTRIBUTE_READ` | field | exact (sop: VEX point()/prim()) | unsupported (pcg: none) |
 | `BOOLEAN_MATH` | field | exact (sop: VEX logic) | unsupported (pcg: none) |
