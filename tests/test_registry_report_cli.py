@@ -3,7 +3,7 @@
 import json
 
 import pytest
-from helpers import EXAMPLES, compile_example, load_example
+from helpers import EXAMPLES, ROOT, compile_example, load_example
 
 from nodebridge.backend.registry import get_backend, list_backends
 from nodebridge.cli import main
@@ -38,9 +38,23 @@ def test_capability_matrix_is_derived_from_translators():
     assert capability("SCATTER", "houdini", "sop").confidence == Confidence.EQUIVALENT
     assert capability("SCATTER", "unreal", "pcg").implementation == "PCGSurfaceSamplerSettings"
     assert capability("EXTRUDE", "unreal", "pcg").confidence == Confidence.UNSUPPORTED
+    assert capability("GLARE", "houdini", "cop2").confidence == Confidence.APPROXIMATE
+    assert capability("ELLIPSE_MASK", "houdini", "cop2").confidence == Confidence.APPROXIMATE
+    assert capability("VIGNETTE", "houdini", "cop2").confidence == Confidence.APPROXIMATE
     rows = {row.kind: row for row in capability_matrix()}
     assert rows["TRANSFORM"].targets["houdini"][0][1].confidence == Confidence.EXACT
     assert "| `SCATTER` |" in format_matrix_markdown()
+
+
+def test_package_versions_match():
+    import tomllib
+
+    from nodebridge import __version__, bl_info
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    manifest = tomllib.loads((ROOT / "src" / "nodebridge" / "blender_manifest.toml").read_text(encoding="utf-8"))
+    assert project["project"]["version"] == __version__ == manifest["version"]
+    assert bl_info["version"] == tuple(int(part) for part in __version__.split("."))
 
 
 def test_new_operations_can_be_registered_without_compiler_changes():

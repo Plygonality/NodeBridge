@@ -79,6 +79,7 @@ Approximations:
   Place Windows (GeometryNodeInstanceOnPoints)
     Reason: Instance on Points becomes a Static Mesh Spawner; mesh primitives map to /Engine/BasicShapes meshes scaled to size.
     - Geometry Nodes instances arbitrary geometry; PCG spawns Static Mesh assets.
+    - Engine mesh scale (0.9, 0.9, 1.3) matches the Blender size. Unreal basic shapes are 1 meter across.
   Realize Windows (GeometryNodeRealizeInstances)
     Reason: PCG spawns instanced static mesh components; there is no 'realize' step.
     - Spawned meshes stay instances.
@@ -95,6 +96,7 @@ Equivalent (intent preserved, details differ):
     Reason: Final point data / spawned meshes.
 
 Warnings:
+  - PCG does not model meshes, so extrude and curves stay unsupported; build that geometry in Houdini or spawn a Static Mesh.
   - An upstream mesh or points source was not translated; the PCG node is connected to the graph Input.
 
 Compiler notes:

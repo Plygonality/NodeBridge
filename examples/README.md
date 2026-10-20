@@ -1,6 +1,6 @@
 # Examples
 
-The four example systems are built in Blender by [`blender/build_examples.py`](blender/build_examples.py). Run it from Blender's Text Editor with **Run Script**, or headless:
+Open [`nodebridge_examples.blend`](nodebridge_examples.blend) to try the four systems. The file is built by [`blender/build_examples.py`](blender/build_examples.py). Rebuild it from Blender's Text Editor with **Run Script**, or headless:
 
 ```bash
 blender --background --factory-startup --python examples/blender/build_examples.py -- --save examples.blend

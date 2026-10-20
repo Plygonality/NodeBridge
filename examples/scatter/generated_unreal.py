@@ -16,7 +16,7 @@ import unreal
 ASSET_PATH = "/Game/NodeBridge"
 SPAWN_PCG_VOLUME = False  # True: also place a PCG Volume using the new graph
 
-# Controls (Blender group inputs, Blender units). Edit and re-run to rebuild the graph.
+# Controls (Blender group inputs, Blender units). These are script constants, not live PCG parameters. Edit and re-run to rebuild the graph.
 DENSITY = 4.0  # Density
 SEED = 7  # Seed
 SCALE_MIN = 0.6  # Scale Min

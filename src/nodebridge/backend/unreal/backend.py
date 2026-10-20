@@ -17,7 +17,6 @@ from ...translation.registry import translator
 from ..base import GeneratedCode, TargetBackend
 from ..codegen import PyWriter, clean_number, literal
 from ..escape import escape
-from ..escape import escape
 from ..registry import register_backend
 from .materials import write_material
 from .pcg import PcgBuilder
@@ -63,6 +62,12 @@ class UnrealBackend(TargetBackend):
 
     def prepare(self, graph: SemanticGraph, diagnostics: DiagnosticBag) -> SemanticGraph:
         inline_where(graph, lambda g, op: True, diagnostics, "PCG subgraph / material function assets are not generated yet")
+        mesh = {"EXTRUDE", "SUBDIVIDE", "BOOLEAN", "CURVE", "CURVE_RESAMPLE", "CURVE_TO_MESH", "MESH_TO_CURVE"}
+        if graph.kind == TreeKind.GEOMETRY and any(op.kind in mesh for op in graph.topological_order()):
+            diagnostics.warning(
+                "unreal.pcg_mesh",
+                "PCG does not model meshes, so extrude and curves stay unsupported; build that geometry in Houdini or spawn a Static Mesh.",
+            )
         return graph
 
     def generate(self, result: "CompilationResult") -> GeneratedCode:
@@ -98,12 +103,21 @@ class UnrealBackend(TargetBackend):
             code = code.replace("import math\n\n", "", 1)
         if len(re.findall(r"\binput_node\b", code)) == 1:
             code = code.replace("    input_node = graph.get_input_node()\n", "", 1)
+        instructions = (
+            "Unreal Editor: Save .py, then Tools > Execute Python Script (needs the Python Editor Script Plugin). "
+            "Pasting into the Output Log's Python console also works where multi-line input is supported."
+        )
+        if kind == TreeKind.GEOMETRY:
+            instructions += (
+                " Exposed inputs are constants at the top of the script. "
+                "PCG graph parameters are not created until a live Unreal session confirms that API. Edit the constants and run the script again."
+            )
         return GeneratedCode(
             target=self.id,
             language="python",
             filename=f"nodebridge_{name}_unreal.py",
             code=code,
-            run_instructions="Unreal Editor: Save .py, then Tools > Execute Python Script (needs the Python Editor Script Plugin). Pasting into the Output Log's Python console also works where multi-line input is supported.",
+            run_instructions=instructions,
         )
 
     def _header(self, w: PyWriter, result: "CompilationResult") -> None:
@@ -141,7 +155,7 @@ class UnrealBackend(TargetBackend):
         if not graph.parameters or graph.kind != TreeKind.GEOMETRY:
             return
         w.blank()
-        w.comment("Controls (Blender group inputs, Blender units). Edit and re-run to rebuild the graph.")
+        w.comment("Controls (Blender group inputs, Blender units). These are script constants, not live PCG parameters. Edit and re-run to rebuild the graph.")
         for p in graph.parameters:
             value = p.current
             if isinstance(value, dict):
