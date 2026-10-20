@@ -43,7 +43,7 @@ NodeBridge does **not** promise vertex-identical or pixel-identical results betw
 
 ## Install the Blender add-on
 
-Requirements: **Blender 4.2 LTS or newer** (tested on 4.2 LTS and 4.5 LTS). No other dependencies.
+Requirements: **Blender 4.2 LTS or newer** (tested on 4.2 LTS, 4.5 LTS, and 5.2 LTS). No other dependencies.
 
 1. Get the add-on zip:
    * download `nodebridge-0.3.0.zip` from the repository's releases, **or**
@@ -111,6 +111,15 @@ nb_prop(random_scale_settings, "scale_min", unreal.Vector(SCALE_MIN, SCALE_MIN, 
 | **Unreal target (PCG)** | **Shader to Unreal Material** |
 | ![Panel with Unreal target](docs/images/nodebridge_npanel_unreal.jpg) | ![Shader editor with Unreal target](docs/images/nodebridge_shader_unreal.jpg) |
 
+The building and compositor examples, captured in Blender 5.2.2 LTS. Blender 5.2 keeps the Concrete material as a node tree, so the building panel counts that shader as well.
+
+| Building, target Houdini | Building, target Unreal Engine 5 |
+| --- | --- |
+| ![NodeBridge on the building example, target Houdini](docs/images/nodebridge_building_houdini.jpg) | ![NodeBridge on the building example, target Unreal](docs/images/nodebridge_building_unreal.jpg) |
+| 22 exact, 4 equivalent. Generate writes 361 lines of Houdini Python. | 5 exact, 4 equivalent, 5 approximate, 11 unsupported. PCG does not model the mesh, and the panel lists each gap. |
+| **Compositor, target Unreal Engine 5** | |
+| ![NodeBridge on the compositor example, target Unreal](docs/images/nodebridge_compositor_unreal.jpg) | Glare, color grade, and the vignette are approximate. Exact 0, equivalent 2, approximate 3. |
+
 Complete generated scripts and expected reports for all four examples are in [`examples/`](examples/):
 
 | Example | Blender system | Houdini | Unreal |
@@ -119,20 +128,6 @@ Complete generated scripts and expected reports for all four examples are in [`e
 | [Building](examples/building/) | grid footprint, extruded mass, floor slabs stacked from a nested node group, randomized windows on walls | 21 / 3 / 0 / 0 | 4 / 3 / 5 / 11 (PCG has no mesh modelling) |
 | [Shader](examples/shader/) | noise, color ramp, roughness modulation, bump, a labeled Value node as a parameter | 4 / 3 / 1 / 0 | 4 / 2 / 2 / 0 |
 | [Compositor](examples/compositor/) | render layer, glare, color balance, vignette (ellipse mask + blur + multiply), composite | 0 / 1 / 2 / 2 | 0 / 2 / 3 / 0 |
-
----
-
-## Illustrations of the generated networks
-
-The Blender pictures above were captured in Blender 4.5. These four are visualizations of the scatter example as the generated scripts build it. They follow the node names and the exposed parameters, and they omit some of the smaller nodes. They are not captures from Houdini or Unreal.
-
-| Houdini SOP network | Unreal PCG graph |
-| --- | --- |
-| ![Illustration of the Houdini network /obj/nb_scatter_rocks](docs/images/viz_houdini_scatter.jpg) | ![Illustration of the Unreal PCG graph PCG_ScatterRocks](docs/images/viz_unreal_pcg.jpg) |
-| `/obj/nb_scatter_rocks`. The NodeBridge tab holds Density, Seed, Scale Min, Scale Max, Coverage, and Use Source Object. | `PCG_ScatterRocks`. The spawner points at `/Engine/BasicShapes/Sphere` and `M_ProceduralRock`. |
-| **Houdini MaterialX** | **Unreal Material** |
-| ![Illustration of the Houdini MaterialX network /mat/procedural_rock](docs/images/viz_houdini_material.jpg) | ![Illustration of the Unreal material M_ProceduralRock](docs/images/viz_unreal_material.jpg) |
-| `/mat/procedural_rock`, the MaterialX network for the rock shader. | `M_ProceduralRock`, the Unreal material for the same shader. |
 
 ---
 
@@ -180,9 +175,9 @@ Any other node becomes an `UNSUPPORTED_OPERATION`: it is reported, and a placeho
 
 ## What has been verified, and what has not
 
-* **Blender side (verified):** the parser, the add-on UI, the operators and the extension package were run in real **Blender 4.2.23 LTS and 4.5.14 LTS**, both in background and in the GUI. The clipboard copy was checked against the system clipboard. Node socket identifiers and properties were probed in both versions.
+* **Blender side (verified):** the parser, the add-on UI, the operators and the extension package were run in real **Blender 4.2.23 LTS and 4.5.14 LTS**, both in background and in the GUI. The clipboard copy was checked against the system clipboard. Node socket identifiers and properties were probed in both versions. The same background checks, and the GUI operators used for the screenshots above, were run again in **Blender 5.2.2 LTS**. Compositor sockets that 5.2 moved onto menus (Glare type and quality, the composite group output) were probed there.
 * **Generated code (structurally verified):** every generated Houdini and Unreal script is parsed, then executed against recording stand-ins for `hou` and `unreal` (in `tests/fakes/`). Those stand-ins check call shapes, wiring and pin labels.
-* **Not yet verified in a live Houdini or Unreal session.** No Houdini or Unreal licence was available while building 0.3. API usage follows the documented `hou` and Unreal Python APIs, and version-sensitive calls are guarded. Some SOP / COP2 parameter names and Unreal PCG property names may differ in your version: the script reports them as warnings instead of failing. Running the four examples in real Houdini 20.x and Unreal 5.4+ is the top item on the [roadmap](docs/roadmap.md). The Houdini and Unreal pictures in this README are illustrations of the generated graphs, not evidence from a live session.
+* **Not yet verified in a live Houdini or Unreal session.** No Houdini or Unreal licence was available while building 0.3. API usage follows the documented `hou` and Unreal Python APIs, and version-sensitive calls are guarded. Some SOP / COP2 parameter names and Unreal PCG property names may differ in your version: the script reports them as warnings instead of failing. Running the four examples in real Houdini 20.x and Unreal 5.4+ is the top item on the [roadmap](docs/roadmap.md).
 * **Randomness:** the NodeBridge hash is identical in Python and VEX. The test suite compiles the generated VEX library as C and compares it with Python. Blender's own random sequence is not reproduced, so random-dependent operations are classified EQUIVALENT.
 
 ## Known limitations

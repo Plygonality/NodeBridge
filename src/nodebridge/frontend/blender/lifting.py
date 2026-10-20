@@ -281,6 +281,11 @@ class LiftContext:
                 continue
             if data_type in GEOMETRY_TYPES and not self.graph.is_subgraph:
                 self.emit("GEOMETRY_OUTPUT", node, {"geometry": value}, {"name": socket.name}, name=socket.name)
+            elif self.kind == TreeKind.COMPOSITOR and not self.graph.is_subgraph and data_type == DataType.COLOR:
+                # Blender 5.x compositors end at a group output instead of Composite.
+                image_outputs = [s for s in node.inputs if s.name == "Image" and s.identifier != "__extend__"]
+                if socket.name == "Image" or not image_outputs:
+                    self.emit("COMPOSITE_OUTPUT", node, {"image": value}, {"viewer": False}, name=socket.name or "Composite")
             self.graph.outputs.append(GraphOutput(socket.identifier, value, data_type, socket.name))
 
     def lift_group_node(self, node: GraphNode, sub: SemanticGraph) -> None:
