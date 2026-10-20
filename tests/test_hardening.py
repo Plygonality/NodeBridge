@@ -24,7 +24,7 @@ from nodebridge.compiler.pipeline import analyze, compile_document
 from nodebridge.compiler.report import TranslationReport
 from nodebridge.frontend.blender.lifting import LiftError
 from nodebridge.frontend.blender.parser import apply_modifier_values
-from nodebridge.ir.graph import GraphDocument, TreeKind
+from nodebridge.ir.graph import GraphDocument, GraphEdge, TreeKind
 from nodebridge.ir.serialization import dumps_graph, loads_graph
 from nodebridge.ir.types import DataType
 from nodebridge.translation.confidence import Confidence
@@ -322,8 +322,27 @@ def test_cycle_makes_generate_exit_1(tmp_path, capsys):
     builder.link("A", "Value", "B", "Value").link("B", "Value", "A", "Value").link("A", "Value", "Group Output", "Socket_1")
     path = tmp_path / "cycle.graph.json"
     path.write_text(dumps_graph(builder.document()), encoding="utf-8")
-    assert main(["generate", str(path), "--target", "houdini"]) == 1
-    assert "nodebridge:" not in capsys.readouterr().err or True
+    out = tmp_path / "cycle.py"
+    assert main(["generate", str(path), "--target", "houdini", "-o", str(out)]) == 1
+    err = capsys.readouterr().err
+    assert "Cycle between nodes" in err
+    assert "nothing to generate" not in err
+    assert not out.exists()
+    assert compile_document(loads_graph(path.read_text(encoding="utf-8")), "houdini").code is None
+
+
+def test_dangling_edge_prints_the_diagnostic(tmp_path, capsys):
+    builder = geometry_passthrough("Dangle")
+    builder.link("Group Input", "Socket_0", "Group Output", "Socket_1")
+    builder.tree.edges.append(GraphEdge("Missing", "X", "Group Output", "Socket_1"))
+    path = tmp_path / "dangle.graph.json"
+    path.write_text(dumps_graph(builder.document()), encoding="utf-8")
+    out = tmp_path / "dangle.py"
+    assert main(["generate", str(path), "--target", "houdini", "-o", str(out)]) == 1
+    err = capsys.readouterr().err
+    assert "Link references a missing node (Missing -> Group Output)." in err
+    assert "nothing to generate" not in err
+    assert not out.exists()
 
 
 def test_missing_selection_keeps_geometry():

@@ -75,7 +75,11 @@ def _main(argv: list[str] | None = None) -> int:
         return 1 if result.diagnostics.errors else 0
     generate(result)
     if result.code is None:
-        print("nothing to generate", file=sys.stderr)
+        if result.diagnostics.errors:
+            for item in result.diagnostics.errors:
+                print(f"nodebridge: {item.message}", file=sys.stderr)
+        else:
+            print("nothing to generate", file=sys.stderr)
         return 1
     if args.output:
         args.output.write_text(result.code.code, encoding="utf-8")
