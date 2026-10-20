@@ -668,6 +668,28 @@ def test_houdini_lift_is_combined_not_the_unreal_offset():
     assert "setInput" in held
 
 
+def test_several_colour_outputs_get_one_display_flag():
+    builder = TreeBuilder("Passes", TreeKind.COMPOSITOR)
+    builder.interface("Beauty", "Beauty", "OUTPUT", COLOR)
+    builder.interface("Diffuse", "Diffuse", "OUTPUT", COLOR)
+    builder.interface("Glossy", "Glossy", "OUTPUT", COLOR)
+    builder.group_io()
+    result = compile_document(builder.document(), "houdini")
+    outputs = [op for op in result.semantic.ops.values() if op.kind == "COMPOSITE_OUTPUT"]
+    assert [op.name for op in outputs] == ["Beauty", "Diffuse", "Glossy"]
+    assert [op.name for op in outputs if op.params.get("display")] == ["Beauty"]
+    assert result.code.code.count("setDisplayFlag(True)") == 1
+
+    image = TreeBuilder("ImagePass", TreeKind.COMPOSITOR)
+    image.interface("Beauty", "Beauty", "OUTPUT", COLOR)
+    image.interface("Image", "Image", "OUTPUT", COLOR)
+    image.group_io()
+    preferred = compile_document(image.document(), "houdini")
+    shown = [op.name for op in preferred.semantic.ops.values() if op.kind == "COMPOSITE_OUTPUT" and op.params.get("display")]
+    assert shown == ["Image"]
+    assert preferred.code.code.count("setDisplayFlag(True)") == 1
+
+
 def test_pcg_missing_source_connects_the_input():
     builder = geometry_passthrough("CubeScatter")
     builder.node("Cube", "GeometryNodeMeshCube", inputs=[socket("Size", V, [1, 1, 1])], outputs=[socket("Mesh", G, output=True)])

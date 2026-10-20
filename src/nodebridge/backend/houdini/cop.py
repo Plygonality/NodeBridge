@@ -123,7 +123,8 @@ def _image(b: CopBuilder, op: SemanticOp) -> None:
 def _output(b: CopBuilder, op: SemanticOp) -> None:
     var = b.node(op, "null")
     b.chain(op, var)
-    b.w.line(f"{var}.setDisplayFlag(True)")
+    if op.params.get("display", True):
+        b.w.line(f"{var}.setDisplayFlag(True)")
 
 
 @_cop("BLUR", C.EQUIVALENT, "blur COP", "Gaussian blur with the same pixel size.", ("Filter type is not mapped.",))
