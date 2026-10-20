@@ -25,7 +25,7 @@ confidence for specific configurations (see the translation report).
 | `ALIGN_ROTATION` | field | equivalent (sop: VEX dihedral()) | unsupported (pcg: none) |
 | `ATTRIBUTE_READ` | field | exact (sop: VEX point()/prim()) | unsupported (pcg: none) |
 | `BOOLEAN_MATH` | field | exact (sop: VEX logic) | unsupported (pcg: none) |
-| `COLOR_OPERATION` | field | exact (mtlx: mtlxsubtract (invert)) | exact (material: OneMinus / Desaturation) |
+| `COLOR_OPERATION` | field | exact (mtlx: mtlxsubtract (invert) / mtlxhsvadjust) | exact (material: OneMinus / Desaturation / HueShift) |
 | `COLOR_RAMP` | field | exact (mtlx: mtlxremap + mtlxclamp + mtlxmix chain)<br>exact (sop: VEX piecewise interpolation) | exact (material: Lerp chain with saturated remaps)<br>unsupported (pcg: none) |
 | `COMBINE_VECTOR` | field | exact (mtlx: mtlxcombine3)<br>exact (sop: VEX set()) | exact (material: AppendVector)<br>unsupported (pcg: none) |
 | `COMPARE` | field | exact (sop: VEX comparison) | unsupported (pcg: none) |
@@ -33,7 +33,7 @@ confidence for specific configurations (see the translation report).
 | `INTERPOLATE` | field | unsupported | unsupported (pcg: none) |
 | `MAP_RANGE` | field | exact (mtlx: mtlxremap (+ mtlxclamp))<br>exact (sop: VEX fit()/efit()) | exact (material: Subtract / Divide / Lerp)<br>unsupported (pcg: none) |
 | `MATH` | field | exact (mtlx: MaterialX math nodes)<br>exact (sop: VEX arithmetic) | exact (material: Material arithmetic expressions)<br>unsupported (pcg: none) |
-| `MIX` | field | approximate (cop2: over / multiply / add COP)<br>exact (mtlx: mtlxmix)<br>exact (sop: VEX lerp()) | exact (material: LinearInterpolate)<br>unsupported (pcg: none) |
+| `MIX` | field | approximate (cop2: matching COP2 blend)<br>exact (mtlx: mtlxmix)<br>exact (sop: VEX lerp()) | exact (material: LinearInterpolate)<br>unsupported (pcg: none) |
 | `NOISE` | field | approximate (mtlx: mtlxfractal3d)<br>approximate (sop: VEX fractal noise()) | approximate (material: MaterialExpressionNoise)<br>unsupported (pcg: none) |
 | `PROCEDURAL_TEXTURE` | field | unsupported | unsupported |
 | `PROXIMITY` | field | exact (sop: VEX xyzdist()/nearpoint()) | unsupported (pcg: none) |

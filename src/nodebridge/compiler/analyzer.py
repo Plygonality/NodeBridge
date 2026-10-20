@@ -15,7 +15,7 @@ from ..ir.graph import NodeTree, TreeKind
 OUTPUT_NODE_TYPES = {
     TreeKind.GEOMETRY: {"NodeGroupOutput"},
     TreeKind.SHADER: {"ShaderNodeOutputMaterial", "ShaderNodeOutputWorld", "ShaderNodeOutputLight", "ShaderNodeOutputAOV", "NodeGroupOutput"},
-    TreeKind.COMPOSITOR: {"CompositorNodeComposite", "CompositorNodeViewer", "CompositorNodeOutputFile", "NodeGroupOutput"},
+    TreeKind.COMPOSITOR: {"CompositorNodeComposite", "CompositorNodeOutputFile", "NodeGroupOutput"},
 }
 IGNORED_NODE_TYPES = {"NodeFrame"}
 
@@ -161,7 +161,7 @@ def output_nodes(tree: NodeTree) -> list[str]:
     for node in tree.nodes.values():
         if node.type not in types:
             continue
-        if node.parameters.get("is_active_output") is False and node.type != "CompositorNodeViewer":
+        if node.parameters.get("is_active_output") is False:
             continue
         result.append(node.id)
     return result

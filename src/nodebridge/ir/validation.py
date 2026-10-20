@@ -9,8 +9,39 @@ from .semantic import Const, Link, Param, SemanticGraph, iter_links
 from .types import Conversion, DataType, conversion
 
 
+# These sockets are multi-inputs: every link is read (see LiftContext.multi_input).
+_MULTI_INPUTS = {
+    ("GeometryNodeJoinGeometry", "Geometry"),
+    ("GeometryNodeMeshBoolean", "Mesh 2"),
+}
+
+
+def _multi_input(tree: NodeTree, node_id: str, socket: str) -> bool:
+    node = tree.nodes.get(node_id)
+    return node is not None and (node.type, socket) in _MULTI_INPUTS
+
+
 def validate_tree(tree: NodeTree) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
+    seen_targets: set[tuple[str, str]] = set()
+    for edge in tree.edges:
+        key = (edge.to_node, edge.to_socket)
+        if key in seen_targets:
+            if _multi_input(tree, edge.to_node, edge.to_socket):
+                continue
+            target = tree.nodes.get(edge.to_node)
+            label = target.display_name if target is not None else edge.to_node
+            diagnostics.append(
+                Diagnostic(
+                    Severity.WARNING,
+                    "graph.multiple_links",
+                    f"More than one link targets {label}.{edge.to_socket}; only the first is used by the compiler.",
+                    tree=tree.name,
+                    nodes=[edge.to_node],
+                )
+            )
+        else:
+            seen_targets.add(key)
     for edge in tree.edges:
         source = tree.nodes.get(edge.from_node)
         target = tree.nodes.get(edge.to_node)
@@ -44,6 +75,8 @@ def validate_document(document: GraphDocument) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     if document.root not in document.trees:
         return [Diagnostic(Severity.ERROR, "graph.missing_root", f"Root tree {document.root!r} is missing.")]
+    for name in document.duplicate_trees:
+        diagnostics.append(Diagnostic(Severity.WARNING, "graph.duplicate_tree", f"Tree {name!r} is defined more than once; the first definition is used."))
     for tree in document.trees.values():
         diagnostics.extend(validate_tree(tree))
         for node in tree.nodes.values():

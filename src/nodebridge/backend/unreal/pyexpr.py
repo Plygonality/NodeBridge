@@ -13,9 +13,10 @@ from __future__ import annotations
 from typing import Any
 
 from ...backend.codegen import clean_number, literal
-from ...common.coordinates import UNREAL, convert_point, convert_scale
+from ...common.coordinates import UNREAL, convert_point, convert_scale, finite_components, has_non_finite
 from ...common.names import snake_case
-from ...common.units import UNREAL_UNITS, BLENDER_UNITS, ValueRole, convert_length
+from ...common.units import UNREAL_UNITS, BLENDER_UNITS, ValueRole, convert_length, scene_scale_of
+from ...compiler.limits import MAX_EXPRESSION_DEPTH, note_depth
 from ...ir.semantic import Const, InputValue, Link, Param, SemanticGraph
 from ...ir.types import DataType
 
@@ -31,7 +32,7 @@ MATH = {
     "ABSOLUTE": "abs({a})",
     "FLOOR": "math.floor({a})",
     "CEIL": "math.ceil({a})",
-    "ROUND": "math.floor({a} + 0.5)",
+    "ROUND": "math.copysign(math.floor(abs({a}) + 0.5), {a})",
     "SQRT": "math.sqrt(max({a}, 0.0))",
     "SINE": "math.sin({a})",
     "COSINE": "math.cos({a})",
@@ -45,11 +46,24 @@ def control_name(key: str) -> str:
 
 
 class PyExpr:
-    def __init__(self, graph: SemanticGraph) -> None:
+    def __init__(self, graph: SemanticGraph, diagnostics=None) -> None:
         self.graph = graph
+        self.diagnostics = diagnostics
         self.uses_math = False
+        self.scene_scale = scene_scale_of(graph.source)
+        self._depth = 0
 
     def components(self, value: InputValue | None, count: int) -> list[str] | None:
+        self._depth += 1
+        try:
+            if self._depth > MAX_EXPRESSION_DEPTH:
+                note_depth(self.diagnostics, "compiler.depth", f"Expression nesting exceeded {MAX_EXPRESSION_DEPTH}; the current value was baked.")
+                return None
+            return self._components(value, count)
+        finally:
+            self._depth -= 1
+
+    def _components(self, value: InputValue | None, count: int) -> list[str] | None:
         if value is None:
             return None
         if isinstance(value, Const):
@@ -57,9 +71,23 @@ class PyExpr:
             if isinstance(raw, dict) or raw is None:
                 return None
             items = list(raw) if isinstance(raw, (list, tuple)) else [raw] * count
+            if any(has_non_finite(item) for item in items):
+                self._warn_non_finite()
+            cleaned, changed = finite_components(items, count)
+            if changed:
+                self._warn_non_finite()
             if count == 1 and len(items) > 1:
-                items = [sum(float(v) for v in items[:3]) / len(items[:3])]
-            return [literal(v) if isinstance(v, (bool, int)) else literal(clean_number(float(v))) for v in (items + [0.0] * count)[:count]]
+                cleaned = [sum(cleaned[:3]) / len(cleaned[:3])]
+            rendered = []
+            originals = list(raw) if isinstance(raw, (list, tuple)) else [raw] * count
+            for original, number in zip(originals, cleaned):
+                if isinstance(original, bool):
+                    rendered.append(literal(original))
+                elif isinstance(original, int) and not changed:
+                    rendered.append(literal(original))
+                else:
+                    rendered.append(literal(clean_number(number)))
+            return rendered
         if isinstance(value, Param):
             parameter = self.graph.parameter(value.name)
             name = control_name(value.name)
@@ -96,29 +124,48 @@ class PyExpr:
             if op.kind == "SEPARATE_VECTOR":
                 vector = self.components(op.inputs.get("vector"), 3)
                 return [vector["xyz".index(value.output)]] * count if vector else None
+            if op.kind == "VECTOR_MATH":
+                # Walk the inputs so a long chain hits the depth limit. PCG has no
+                # vector-math node, so the value still falls back to the caller's default.
+                for key in ("a", "b", "c", "scale"):
+                    if key in op.inputs:
+                        self.components(op.inputs[key], 1 if key == "scale" else 3)
+                return None
         return None
 
     def scalar(self, value: InputValue | None, default: Any, role: ValueRole = ValueRole.SCALAR) -> str:
         parts = self.components(value, 1)
         if parts is None:
             parts = [literal(default)]
-        return to_unreal(parts, role)[0]
+        return to_unreal(parts, role, scene_scale=self.scene_scale)[0]
 
     def vector(self, value: InputValue | None, default: Any, role: ValueRole) -> list[str]:
         parts = self.components(value, 3)
         if parts is None:
-            parts = [literal(clean_number(float(v))) for v in default]
-        return to_unreal(parts, role)
+            safe, changed = finite_components(default, 3)
+            if changed:
+                self._warn_non_finite()
+            parts = [literal(clean_number(v)) for v in safe]
+        return to_unreal(parts, role, scene_scale=self.scene_scale)
+
+    def _warn_non_finite(self) -> None:
+        if getattr(self, "_warned_non_finite", False):
+            return
+        self._warned_non_finite = True
+        if self.diagnostics is not None:
+            self.diagnostics.warning("unreal.non_finite", "Non-finite components were replaced with 0 before axis conversion.", target="unreal")
 
 
-def to_unreal(components: list[str], role: ValueRole) -> list[str]:
+def to_unreal(components: list[str], role: ValueRole, *, scene_scale: float = 1.0) -> list[str]:
     """Blender-frame component expressions -> Unreal frame and units."""
-    factor = convert_length(1.0, BLENDER_UNITS, UNREAL_UNITS)
+    factor = convert_length(1.0, BLENDER_UNITS, UNREAL_UNITS, scene_scale=scene_scale)
     if len(components) == 1:
         if role in (ValueRole.LENGTH, ValueRole.POSITION):
             return [_scale(components[0], factor)]
         if role == ValueRole.ANGLE:
             return [f"math.degrees({components[0]})"]
+        if role == ValueRole.AREA_DENSITY and scene_scale != 1.0:
+            return [_scale(components[0], 1.0 / (scene_scale * scene_scale))]
         return components
     x, y, z = components
     if role in (ValueRole.POSITION, ValueRole.DIRECTION):

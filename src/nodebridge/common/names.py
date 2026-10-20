@@ -68,6 +68,18 @@ def unreal_parameter_name(name: str, fallback: str = "Parameter") -> str:
     return cleaned or fallback
 
 
+def collapsed_name_warning(original: str, fallback: str, kind: str) -> str | None:
+    """Warning when ``original`` has no ASCII word and the identifier fell back.
+
+    The message includes the original name so a renamed control can be found.
+    """
+    if words(original or ""):
+        return None
+    if not any(ord(ch) > 127 for ch in original or ""):
+        return None
+    return f"{kind} name {original!r} has no ASCII letters; using {fallback!r}."
+
+
 def python_identifier(name: str, fallback: str = "value") -> str:
     """Variable names used inside generated scripts."""
     result = snake_case(name, fallback)

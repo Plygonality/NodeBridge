@@ -14,13 +14,15 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from ...backend.codegen import PyWriter, clean_number, literal
-from ...common.coordinates import HOUDINI, convert_point, convert_scale
-from ...common.names import NameAllocator, houdini_label_name, houdini_node_name, python_identifier, snake_case
-from ...common.units import ValueRole
+from ...backend.escape import escape
+from ...common.coordinates import HOUDINI, convert_point, convert_scale, finite_components, has_non_finite
+from ...common.names import NameAllocator, collapsed_name_warning, houdini_label_name, houdini_node_name, python_identifier, snake_case
+from ...common.units import BLENDER_UNITS, HOUDINI_UNITS, ValueRole, convert_length, scene_scale_of
 from ...ir.operations import Category, get_operation
 from ...ir.semantic import Const, ExposedParameter, InputValue, Link, Param, SemanticGraph, SemanticOp
 from ...ir.types import GEOMETRY_TYPES, DataType
@@ -32,6 +34,7 @@ from .vex import DOMAIN_CLASS, VexCompiler, VexError, library_constant, vex_swit
 T, CTX = "houdini", "sop"
 F, I, B, V = DataType.FLOAT, DataType.INT, DataType.BOOL, DataType.VECTOR3
 ATTRIBUTE_NAMES = {"position": "P", "normal": "N", "id": "id", "material_index": "shop_materialpath", "radius": "pscale", "UVMap": "uv"}
+_SIMPLE_ATTR = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass
@@ -126,6 +129,9 @@ class SopBuilder:
     # -- emission helpers ------------------------------------------------
     def node_name(self, op: SemanticOp, suffix: str = "") -> str:
         base = op.display_name if self.options.preserve_names else op.kind.lower()
+        warning = collapsed_name_warning(base, "node", "Node")
+        if warning and not any(item.code == "name.non_ascii" and item.op == op.id for item in self.result.diagnostics):
+            self.result.diagnostics.warning("name.non_ascii", warning, op=op.id, target=T)
         return self.network.names.allocate(houdini_node_name(base + suffix))
 
     def node(self, op: SemanticOp | None, node_type: str, suffix: str = "", *, name: str | None = None, meta: bool = True) -> str:
@@ -192,7 +198,7 @@ class SopBuilder:
             self.result.diagnostics.warning("houdini.baked", f"A parameter expression feeding {parm!r} could not be expressed in HScript; its current value was baked.", target=T)
             self.set(var, parm, self.convert_constant(raw, role, count))
             return
-        for index, expr in enumerate(to_houdini_components(components, role)):
+        for index, expr in enumerate(to_houdini_components(components, role, scene_scale=scene_scale_of(self.graph.source))):
             if integer:
                 expr = f"int({expr})"
             target_index = "" if count == 1 else f", index={index}"
@@ -215,10 +221,15 @@ class SopBuilder:
             yield value
 
     def convert_constant(self, raw: Any, role: ValueRole, count: int) -> Any:
+        scale = scene_scale_of(self.graph.source)
+        if has_non_finite(raw):
+            self._warn_non_finite()
         if count == 3:
-            items = list(raw) if isinstance(raw, (list, tuple)) else [raw] * 3
-            items = [float(v) for v in (items + [0.0, 0.0, 0.0])[:3]]
+            items, changed = finite_components(raw if isinstance(raw, (list, tuple)) else [raw] * 3, 3)
+            if changed:
+                self._warn_non_finite()
             if role in (ValueRole.POSITION, ValueRole.DIRECTION, ValueRole.NORMAL):
+                items = [convert_length(v, BLENDER_UNITS, HOUDINI_UNITS, scene_scale=scale) for v in items]
                 items = list(convert_point(items, target=HOUDINI))
             elif role == ValueRole.SCALE:
                 items = list(convert_scale(items, target=HOUDINI))
@@ -226,15 +237,41 @@ class SopBuilder:
                 items = [math.degrees(items[0]), math.degrees(items[2]), -math.degrees(items[1])]
             return tuple(clean_number(v) for v in items)
         if isinstance(raw, (list, tuple)):
-            raw = sum(float(v) for v in raw[:3]) / max(len(raw[:3]), 1)
+            items, changed = finite_components(raw, 3)
+            if changed:
+                self._warn_non_finite()
+            raw = sum(items) / max(len(items), 1)
         if isinstance(raw, bool):
             return int(raw)
+        if not isinstance(raw, (int, float)):
+            return raw
+        original = raw
+        number, changed = finite_components(raw, 1)
+        if changed:
+            self._warn_non_finite()
+        raw = number[0]
         if role == ValueRole.ANGLE:
-            return clean_number(math.degrees(float(raw)))
-        return clean_number(float(raw)) if isinstance(raw, float) else raw
+            return clean_number(math.degrees(raw))
+        if role in (ValueRole.LENGTH, ValueRole.POSITION):
+            return clean_number(convert_length(raw, BLENDER_UNITS, HOUDINI_UNITS, scene_scale=scale))
+        if role == ValueRole.AREA_DENSITY and scale != 1.0:
+            return clean_number(raw / (scale * scale))
+        if isinstance(original, int) and not changed:
+            return original
+        return clean_number(raw)
+
+    def _warn_non_finite(self) -> None:
+        if getattr(self, "_warned_non_finite", False):
+            return
+        self._warned_non_finite = True
+        self.result.diagnostics.warning("houdini.non_finite", "Non-finite components were replaced with 0 before axis conversion.", target=T)
 
     def is_true(self, value: InputValue | None) -> bool:
-        return value is None or (isinstance(value, Const) and bool(value.value) is True)
+        return isinstance(value, Const) and bool(value.value) is True
+
+    def keeps_by_default(self, value: InputValue | None) -> bool:
+        """Selections that were omitted still mean 'all' for every op except Delete."""
+        return value is None or (isinstance(value, Const) and value.value is None) or self.is_true(value)
 
     def is_false(self, value: InputValue | None) -> bool:
         return isinstance(value, Const) and not value.value
@@ -271,7 +308,7 @@ class SopBuilder:
     def selection_group(self, op: SemanticOp, stream: Stream | None, domain: str, name: str) -> tuple[Stream | None, str]:
         """Evaluate a selection field into a group; returns (stream, group name or '')."""
         selection = op.inputs.get("selection")
-        if self.is_true(selection):
+        if self.keeps_by_default(selection):
             return stream, ""
         group = f"nb_{name}_{snake_case(op.id)}"
         setter = "setprimgroup" if domain == "prim" else "setpointgroup"
@@ -543,7 +580,15 @@ def _curve(b: SopBuilder, op: SemanticOp) -> None:
     b.set_output(op, "geometry", var)
 
 
-@_sop("TRANSFORM", C.EXACT, "xform SOP", "Translation, Euler rotation and scale converted to Houdini's Y-up frame (rotation order xzy).")
+def _transform_classify(op, graph, base):
+    for key in ("translation", "rotation", "scale"):
+        value = op.inputs.get(key)
+        if isinstance(value, Const) and has_non_finite(value.value):
+            return Classification(C.APPROXIMATE, "Non-finite components were replaced with 0.", base.implementation, ["NaN and Inf do not survive the axis conversion."])
+    return None
+
+
+@_sop("TRANSFORM", C.EXACT, "xform SOP", "Translation, Euler rotation and scale converted to Houdini's Y-up frame (rotation order xzy).", classify=_transform_classify)
 def _transform(b: SopBuilder, op: SemanticOp) -> None:
     var = b.node(op, "xform")
     b.connect(var, 0, b.stream_for(op.inputs.get("geometry")))
@@ -568,9 +613,15 @@ def _domain(op: SemanticOp, default: str = "POINT") -> str:
     return {"POINT": "point", "FACE": "prim", "CURVE": "prim", "INSTANCE": "prim", "CORNER": "vertex"}.get(op.params.get("domain", default), "")
 
 
+def _selection_missing(value) -> bool:
+    return value is None or (isinstance(value, Const) and value.value is None)
+
+
 def _delete_classify(op, graph, base):
     if not _domain(op):
         return Classification(C.UNSUPPORTED, f"Deleting on the {op.params.get('domain')} domain is not translated.", "none")
+    if _selection_missing(op.inputs.get("selection")):
+        return Classification(C.APPROXIMATE, "No selection was connected; the geometry is kept.", "pass-through")
     if op.params.get("mode", "ALL") != "ALL":
         return Classification(C.APPROXIMATE, "Only 'All' delete mode is reproduced; edge/face-only modes delete whole elements.", base.implementation)
     return None
@@ -580,6 +631,10 @@ def _delete_classify(op, graph, base):
 def _delete(b: SopBuilder, op: SemanticOp) -> None:
     stream = b.stream_for(op.inputs.get("geometry"))
     selection = op.inputs.get("selection")
+    if _selection_missing(selection):
+        b.result.diagnostics.warning("delete.missing_selection", f"{op.display_name} has no Selection input; the geometry is kept.", op=op.id, target=T)
+        b.set_output(op, "geometry", stream.var if stream else "None")
+        return
     if b.is_false(selection):
         b.set_output(op, "geometry", stream.var if stream else "None")
         return
@@ -689,10 +744,10 @@ def _instance(b: SopBuilder, op: SemanticOp) -> None:
     rotation, scale, selection = op.inputs.get("rotation"), op.inputs.get("scale"), op.inputs.get("selection")
     needs_rotation = rotation is not None and not (isinstance(rotation, Const) and all(abs(float(v)) < 1e-9 for v in rotation.value))
     needs_scale = scale is not None and not (isinstance(scale, Const) and all(abs(float(v) - 1.0) < 1e-9 for v in (scale.value if isinstance(scale.value, (list, tuple)) else [scale.value] * 3)))
-    if needs_rotation or needs_scale or not b.is_true(selection):
+    if needs_rotation or needs_scale or not b.keeps_by_default(selection):
         def body(vc: VexCompiler) -> list[str]:
             lines = []
-            if not b.is_true(selection):
+            if not b.keeps_by_default(selection):
                 lines.append(f"if (!({vc.value(selection, B, default=1)})) {{ removepoint(0, @ptnum); return; }}")
             if needs_scale:
                 lines.append(f"v@scale = nb_hs({vc.value(scale, V, default=1.0)});")
@@ -817,7 +872,7 @@ def _set_position(b: SopBuilder, op: SemanticOp) -> None:
         offset = vc.value(op.inputs.get("offset"), V, default=0.0)
         selection = op.inputs.get("selection")
         lines = [f"vector nb_new = {position} + {offset};"]
-        if b.is_true(selection):
+        if b.keeps_by_default(selection):
             lines.append("v@P = nb_h(nb_new);")
         else:
             lines.append(f"if ({vc.value(selection, B, default=1)}) v@P = nb_h(nb_new);")
@@ -828,6 +883,16 @@ def _set_position(b: SopBuilder, op: SemanticOp) -> None:
 
 
 VEX_ATTR_TYPES = {"FLOAT": "f", "INT": "i", "BOOLEAN": "i", "FLOAT_VECTOR": "v", "FLOAT_COLOR": "v", "BYTE_COLOR": "v", "QUATERNION": "p", "FLOAT2": "u", "INT8": "i"}
+
+
+def _attribute_statement(prefix: str, attr: str, value: str, domain: str) -> str:
+    """Bind a simple name with ``@``. Anything else stays inside a VEX string."""
+    if _SIMPLE_ATTR.match(attr):
+        return f"{prefix}@{attr} = {value};"
+    literal_name = escape(attr, language="vex")
+    if domain == "point":
+        return f'setpointattrib(0, "{literal_name}", @ptnum, {value}, "set");'
+    return f'setprimattrib(0, "{literal_name}", @primnum, {value}, "set");'
 
 
 @_sop("ATTRIBUTE_WRITE", C.EXACT, "attribwrangle", "Store Named Attribute becomes a typed attribute write.", classify=lambda op, g, base: Classification(C.UNSUPPORTED, "Edge-domain attributes have no Houdini equivalent.", "none") if op.params.get("domain") == "EDGE" else None)
@@ -843,9 +908,9 @@ def _attribute_write(b: SopBuilder, op: SemanticOp) -> None:
         value = vc.value(op.inputs.get("value"), want)
         if attr in ("P", "N"):
             value = f"nb_h({value})"
-        line = f"{prefix}@{attr} = {value};"
+        line = _attribute_statement(prefix, attr, value, domain)
         selection = op.inputs.get("selection")
-        return [line] if b.is_true(selection) else [f"if ({vc.value(selection, B, default=1)}) {line}"]
+        return [line] if b.keeps_by_default(selection) else [f"if ({vc.value(selection, B, default=1)}) {line}"]
 
     out = b.wrangle(op, domain, b.stream_for(op.inputs.get("geometry")), body, "")
     b.set_output(op, "geometry", out.var)

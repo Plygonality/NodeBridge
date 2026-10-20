@@ -26,9 +26,9 @@ def _image(ctx: LiftContext, node: GraphNode) -> None:
     ctx.emit("IMAGE_INPUT", node, {"image_ref": Const(ctx.prop(node, "image"), DataType.IMAGE)}, outputs={"image": "Image", "alpha": "Alpha"})
 
 
-@lifts("CompositorNodeComposite", "CompositorNodeViewer", kinds=CMP)
+@lifts("CompositorNodeComposite", kinds=CMP)
 def _composite(ctx: LiftContext, node: GraphNode) -> None:
-    ctx.emit("COMPOSITE_OUTPUT", node, {"image": ctx.input(node, "Image")}, {"viewer": node.type == "CompositorNodeViewer"})
+    ctx.emit("COMPOSITE_OUTPUT", node, {"image": ctx.input(node, "Image")}, {"viewer": False})
 
 
 def _menu_or_prop(ctx: LiftContext, node: GraphNode, socket_name: str, prop: str, default: str) -> str:
@@ -77,9 +77,12 @@ def _graded(ctx: LiftContext, node: GraphNode, base: str, color: str, prop: str)
         base_value = ctx.input(node, base)
         color_value = ctx.input(node, color)
         if isinstance(base_value, Const) and isinstance(color_value, Const):
-            scale = float(base_value.value or 0.0)
-            rgb = list(color_value.value or [1.0, 1.0, 1.0])[:3]
-            return Const([c * scale for c in rgb], DataType.COLOR)
+            base = float(base_value.value or 0.0)
+            rgb = [float(c) for c in list(color_value.value or [1.0, 1.0, 1.0])[:3]]
+            # Blender 5.x Base Lift is additive and neutral at 0. Gamma and gain stay multiplicative.
+            if prop == "lift":
+                return Const([base + (c - 1.0) for c in rgb], DataType.COLOR)
+            return Const([c * base for c in rgb], DataType.COLOR)
         return color_value
     return Const(list(ctx.prop(node, prop, [1.0, 1.0, 1.0]))[:3], DataType.COLOR)
 
@@ -97,7 +100,7 @@ def _color_balance(ctx: LiftContext, node: GraphNode) -> None:
             "gamma": _graded(ctx, node, "Base Gamma", "Color Gamma", "gamma"),
             "gain": _graded(ctx, node, "Base Gain", "Color Gain", "gain"),
         },
-        {"method": method},
+        {"method": method, **({"lift_additive": True} if node.find_input("Color Lift") is not None else {})},
         {"image": "Image"},
     )
 

@@ -65,6 +65,12 @@ class CompilationResult:
 
 
 PASSTHROUGH_ROLES = {"ADD", "SUBTRACT", "MINIMUM", "MAXIMUM", "MULTIPLY", "DIVIDE", "SNAP", "ABSOLUTE"}
+# Structural errors that make lifting and code generation meaningless.
+HALT_CODES = {"graph.missing_root", "graph.missing_socket", "graph.incompatible_link", "graph.dangling_edge", "graph.missing_group"}
+
+
+def _halted(diagnostics: DiagnosticBag) -> bool:
+    return any(item.severity == Severity.ERROR and item.code in HALT_CODES for item in diagnostics)
 
 
 def infer_parameter_roles(graph: SemanticGraph) -> None:
@@ -111,6 +117,8 @@ def analyze(
     diagnostics = DiagnosticBag()
     diagnostics.extend(validate_document(document))
     backend = get_backend(target)
+    if _halted(diagnostics):
+        return _aborted(document, target, options, diagnostics, backend)
     semantic = get_frontend(frontend).lift(document, diagnostics)
     diagnostics.extend(validate_semantic(semantic))
     backend.validate(semantic, diagnostics)
@@ -141,12 +149,15 @@ def analyze(
         blocked = not classification.confidence.allowed_by(options.strictness) and classification.confidence.rank < 3
         if blocked:
             result.blocked.add(key)
-        if _reportable(op):
+        if _reportable(op, graph):
             suggestion = ""
             if fallback is not None and classification.confidence.rank == 3:
                 found = fallback.suggest(op, graph, target)
                 suggestion = found.summary if found else ""
-            entries.append(ReportEntry(graph.name, op.id, op.kind, op.display_name, op.source.types, classification, blocked, suggestion))
+            name = op.display_name
+            if op.annotations.get("inlined_from"):
+                name = f"{name} (inlined)"
+            entries.append(ReportEntry(graph.name, op.id, op.kind, name, op.source.types, classification, blocked, suggestion))
     source = document.source
     result.report = TranslationReport(
         source_kind=semantic.kind.label,
@@ -187,15 +198,45 @@ def _ordered_walk(graph: SemanticGraph):
         yield from _ordered_walk(sub)
 
 
-def _reportable(op: SemanticOp) -> bool:
-    return not op.name.endswith("(implicit)")
+def _reportable(op: SemanticOp, graph: SemanticGraph) -> bool:
+    if op.name.endswith("(implicit)"):
+        return False
+    if op.kind == "GEOMETRY_INPUT" and graph.use_count(op.id) == 0:
+        return False
+    return True
+
+
+def _aborted(document: GraphDocument, target: str, options: CompileOptions, diagnostics: DiagnosticBag, backend) -> CompilationResult:
+    """A document that failed structural validation. Nothing is lifted or generated."""
+    if document.root in document.trees:
+        kind = document.trees[document.root].kind
+    else:
+        kind = TreeKind.GEOMETRY
+    semantic = SemanticGraph(name=document.root or "invalid", kind=kind, source=dict(document.source))
+    source = document.source
+    report = TranslationReport(
+        source_kind=kind.label,
+        source_name=source.get("display_name") or document.root,
+        source_application=source.get("application", ""),
+        target=target,
+        target_label=backend.display_name,
+        node_count=document.node_count() if document.root in document.trees else 0,
+        diagnostics=list(diagnostics),
+        strictness=options.strictness.value,
+    )
+    return CompilationResult(document=document, target=target, options=options, semantic=semantic, context="", report=report, diagnostics=diagnostics)
 
 
 def generate(result: CompilationResult) -> CompilationResult:
+    if _halted(result.diagnostics):
+        return result
     backend = get_backend(result.target)
     if backend.context_for(result.semantic.kind) is None:
         return result
+    before = len(result.diagnostics)
     result.code = backend.generate(result)
+    for problem in result.diagnostics[before:]:
+        result.report.diagnostics.append(problem)
     for problem in backend.validate_script(result.code.code):
         result.diagnostics.append(problem)
         result.report.diagnostics.append(problem)
