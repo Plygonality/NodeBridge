@@ -17,7 +17,6 @@ from ...translation.registry import translator
 from ..base import GeneratedCode, TargetBackend
 from ..codegen import PyWriter, clean_number, literal
 from ..escape import escape
-from ..escape import escape
 from ..registry import register_backend
 from .materials import write_material
 from .pcg import PcgBuilder

@@ -16,7 +16,6 @@ from typing import Any, Callable
 
 from ...common.names import NameAllocator, collapsed_name_warning, python_identifier
 from ...common.units import ValueRole
-from ...compiler.limits import MAX_GROUP_DEPTH
 from ...compiler.analyzer import analyze_tree
 from ...compiler.diagnostics import DiagnosticBag
 from ...compiler.limits import MAX_GROUP_DEPTH

@@ -12,7 +12,6 @@ import contextlib
 import importlib
 import io
 import json
-import math
 import sys
 
 import pytest
@@ -29,7 +28,7 @@ from nodebridge.ir.serialization import dumps_graph, loads_graph
 from nodebridge.ir.types import DataType
 from nodebridge.translation.confidence import Confidence
 
-from helpers import B, F, G, I, V, TreeBuilder, geometry_passthrough, run_script, socket
+from helpers import B, F, G, I, V, TreeBuilder, geometry_passthrough, socket
 
 COLOR = DataType.COLOR
 S = DataType.STRING
