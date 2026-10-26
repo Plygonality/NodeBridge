@@ -73,14 +73,21 @@ class PyExpr:
             items = list(raw) if isinstance(raw, (list, tuple)) else [raw] * count
             if any(has_non_finite(item) for item in items):
                 self._warn_non_finite()
-            cleaned, changed = finite_components(items, count)
+            # finite_components pads and truncates to `count`. A scalar read has to
+            # average the supplied components first (non-finite values become 0), and
+            # a short vector is padded with 0.0 only after that.
+            averaged = count == 1 and len(items) > 1
+            if averaged:
+                sample, changed = finite_components(items[:3], len(items[:3]))
+                cleaned = [sum(sample) / len(sample)]
+            else:
+                cleaned, changed = finite_components(items, count)
             if changed:
                 self._warn_non_finite()
-            if count == 1 and len(items) > 1:
-                cleaned = [sum(cleaned[:3]) / len(cleaned[:3])]
             rendered = []
             originals = list(raw) if isinstance(raw, (list, tuple)) else [raw] * count
-            for original, number in zip(originals, cleaned):
+            for index, number in enumerate(cleaned):
+                original = originals[index] if not averaged and index < len(originals) else None
                 if isinstance(original, bool):
                     rendered.append(literal(original))
                 elif isinstance(original, int) and not changed:

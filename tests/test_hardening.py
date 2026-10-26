@@ -435,6 +435,63 @@ def test_scene_scale_and_non_finite_values():
     assert move.classification.confidence != Confidence.EXACT
 
 
+def test_unreal_const_vector_mean_and_padding():
+    """A vector constant read as a scalar is the mean; a short vector is padded with 0.0."""
+    from nodebridge.backend.unreal.pyexpr import PyExpr
+    from nodebridge.compiler.diagnostics import DiagnosticBag
+    from nodebridge.ir.graph import TreeKind
+    from nodebridge.ir.semantic import Const, SemanticGraph
+
+    graph = SemanticGraph("Constants", TreeKind.GEOMETRY)
+    diagnostics = DiagnosticBag()
+    expr = PyExpr(graph, diagnostics)
+    assert expr.components(Const([1, 2, 3]), 1) == ["2.0"]
+    assert expr.components(Const([1.0, 2.0, 3.0]), 1) == ["2.0"]
+    assert expr.components(Const([1, 2]), 1) == ["1.5"]
+    assert expr.components(Const([1, 2]), 3) == ["1", "2", "0.0"]
+    assert "unreal.non_finite" not in {item.code for item in diagnostics}
+
+    dirty = DiagnosticBag()
+    warned = PyExpr(graph, dirty)
+    assert warned.components(Const([1, float("nan"), 3]), 1) == ["1.333333"]
+    assert warned.components(Const([float("nan"), float("inf"), 2]), 3) == ["0.0", "0.0", "2.0"]
+    assert "unreal.non_finite" in {item.code for item in dirty}
+
+
+def test_houdini_const_vector_mean_and_padding():
+    """Average the supplied components, then pad. A missing axis must not dilute the mean."""
+    from nodebridge.backend.codegen import PyWriter
+    from nodebridge.backend.houdini.sop import Network, SopBuilder
+    from nodebridge.common.names import NameAllocator
+    from nodebridge.common.units import ValueRole
+    from nodebridge.compiler.diagnostics import DiagnosticBag
+    from nodebridge.ir.graph import TreeKind
+    from nodebridge.ir.semantic import SemanticGraph
+
+    graph = SemanticGraph("Constants", TreeKind.GEOMETRY)
+
+    def builder():
+        bag = DiagnosticBag()
+
+        class Result:
+            diagnostics = bag
+
+        sop = SopBuilder(None, Result(), graph, PyWriter(), Network("geo", graph.name, []), NameAllocator())
+        return sop, bag
+
+    sop, diagnostics = builder()
+    assert sop.convert_constant([1, 2, 3], ValueRole.SCALAR, 1) == 2.0
+    assert sop.convert_constant([1.0, 2.0, 3.0], ValueRole.SCALAR, 1) == 2.0
+    assert sop.convert_constant([1, 2], ValueRole.SCALAR, 1) == 1.5
+    assert sop.convert_constant([1, 2], ValueRole.SCALAR, 3) == (1.0, 2.0, 0.0)
+    assert "houdini.non_finite" not in {item.code for item in diagnostics}
+
+    warned, dirty = builder()
+    assert warned.convert_constant([1, float("nan"), 3], ValueRole.SCALAR, 1) == 1.333333
+    assert warned.convert_constant([float("nan"), float("inf"), 2], ValueRole.SCALAR, 3) == (0.0, 0.0, 2.0)
+    assert "houdini.non_finite" in {item.code for item in dirty}
+
+
 def test_non_ascii_fallback_names_the_original():
     builder = geometry_passthrough("Ascii")
     builder.interface("Socket_2", "密度", "INPUT", F, default=1.0)
