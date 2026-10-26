@@ -16,7 +16,6 @@ from typing import Any, Callable
 
 from ...common.names import NameAllocator, collapsed_name_warning, python_identifier
 from ...common.units import ValueRole
-from ...compiler.limits import MAX_GROUP_DEPTH
 from ...compiler.analyzer import analyze_tree
 from ...compiler.diagnostics import DiagnosticBag
 from ...compiler.limits import MAX_GROUP_DEPTH
@@ -264,9 +263,30 @@ class LiftContext:
             elif socket.identifier in self._param_keys:
                 self.outputs[(node.id, socket.identifier)] = Param(self._param_keys[socket.identifier])
 
+    def _composite_display_socket(self, node: GraphNode) -> str | None:
+        """One colour output drives the Houdini display flag: Image, else Beauty, else the first."""
+        candidates = []
+        for socket in node.inputs:
+            if socket.identifier == "__extend__":
+                continue
+            interface = next((s for s in self.tree.outputs if s.identifier == socket.identifier), None)
+            data_type = interface.data_type if interface else socket.data_type
+            if data_type == DataType.COLOR:
+                candidates.append(socket)
+        if not candidates:
+            return None
+        for preferred in ("Image", "Beauty"):
+            match = next((socket for socket in candidates if socket.name == preferred), None)
+            if match is not None:
+                return match.identifier
+        return candidates[0].identifier
+
     def lift_group_output(self, node: GraphNode) -> None:
         if node.parameters.get("is_active_output") is False:
             return
+        display_id = None
+        if self.kind == TreeKind.COMPOSITOR and not self.graph.is_subgraph:
+            display_id = self._composite_display_socket(node)
         for socket in node.inputs:
             if socket.identifier == "__extend__":
                 continue
@@ -285,9 +305,14 @@ class LiftContext:
                 self.emit("GEOMETRY_OUTPUT", node, {"geometry": value}, {"name": socket.name}, name=socket.name)
             elif self.kind == TreeKind.COMPOSITOR and not self.graph.is_subgraph and data_type == DataType.COLOR:
                 # Blender 5.x compositors end at a group output instead of Composite.
-                image_outputs = [s for s in node.inputs if s.name == "Image" and s.identifier != "__extend__"]
-                if socket.name == "Image" or not image_outputs:
-                    self.emit("COMPOSITE_OUTPUT", node, {"image": value}, {"viewer": False}, name=socket.name or "Composite")
+                # One pass gets the display flag. The others stay connected and do not.
+                self.emit(
+                    "COMPOSITE_OUTPUT",
+                    node,
+                    {"image": value},
+                    {"viewer": False, "display": socket.identifier == display_id},
+                    name=socket.name or "Composite",
+                )
             self.graph.outputs.append(GraphOutput(socket.identifier, value, data_type, socket.name))
 
     def lift_group_node(self, node: GraphNode, sub: SemanticGraph) -> None:

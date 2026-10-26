@@ -66,7 +66,7 @@ class CompilationResult:
 
 PASSTHROUGH_ROLES = {"ADD", "SUBTRACT", "MINIMUM", "MAXIMUM", "MULTIPLY", "DIVIDE", "SNAP", "ABSOLUTE"}
 # Structural errors that make lifting and code generation meaningless.
-HALT_CODES = {"graph.missing_root", "graph.missing_socket", "graph.incompatible_link", "graph.dangling_edge", "graph.missing_group"}
+HALT_CODES = {"graph.missing_root", "graph.missing_socket", "graph.incompatible_link", "graph.dangling_edge", "graph.missing_group", "graph.cycle"}
 
 
 def _halted(diagnostics: DiagnosticBag) -> bool:

@@ -60,6 +60,8 @@ def _store(settings, selection, result) -> None:
     settings.approximate = report.count(Confidence.APPROXIMATE)
     settings.unsupported = report.count(Confidence.UNSUPPORTED)
     settings.blocked = len(report.blocked)
+    warnings = report.warnings()
+    settings.warning_total = len(warnings)
     settings.messages.clear()
     for line in report.ui_warnings(MAX_MESSAGES):
         item = settings.messages.add()
@@ -188,6 +190,7 @@ class NODEBRIDGE_OT_clear(Operator):
         settings.code_text = ""
         settings.code_lines = 0
         settings.analyzed = False
+        settings.warning_total = 0
         settings.messages.clear()
         return {"FINISHED"}
 

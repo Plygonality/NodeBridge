@@ -24,7 +24,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [project.scripts]
 nodebridge = "nodebridge.cli:main"
@@ -36,9 +36,23 @@ Homepage = "https://github.com/Plygonality/NodeBridge"
 where = ["src"]
 
 [tool.setuptools.package-data]
-nodebridge = ["blender_manifest.toml", "py.typed"]
+nodebridge = ["blender_manifest.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 160
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+# `I` is the integer type alias and `l` is a link in a few existing modules.
+ignore = ["E741"]
+
+[tool.ruff.lint.per-file-ignores]
+# Blender property annotations are runtime declarations, not unused imports.
+"src/nodebridge/addon/properties.py" = ["F401"]
+"src/nodebridge/addon/operators.py" = ["F401"]

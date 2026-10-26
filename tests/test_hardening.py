@@ -12,7 +12,6 @@ import contextlib
 import importlib
 import io
 import json
-import math
 import sys
 
 import pytest
@@ -24,12 +23,12 @@ from nodebridge.compiler.pipeline import analyze, compile_document
 from nodebridge.compiler.report import TranslationReport
 from nodebridge.frontend.blender.lifting import LiftError
 from nodebridge.frontend.blender.parser import apply_modifier_values
-from nodebridge.ir.graph import GraphDocument, TreeKind
+from nodebridge.ir.graph import GraphDocument, GraphEdge, TreeKind
 from nodebridge.ir.serialization import dumps_graph, loads_graph
 from nodebridge.ir.types import DataType
 from nodebridge.translation.confidence import Confidence
 
-from helpers import B, F, G, I, V, TreeBuilder, geometry_passthrough, run_script, socket
+from helpers import B, F, G, I, V, TreeBuilder, geometry_passthrough, socket
 
 COLOR = DataType.COLOR
 S = DataType.STRING
@@ -322,8 +321,27 @@ def test_cycle_makes_generate_exit_1(tmp_path, capsys):
     builder.link("A", "Value", "B", "Value").link("B", "Value", "A", "Value").link("A", "Value", "Group Output", "Socket_1")
     path = tmp_path / "cycle.graph.json"
     path.write_text(dumps_graph(builder.document()), encoding="utf-8")
-    assert main(["generate", str(path), "--target", "houdini"]) == 1
-    assert "nodebridge:" not in capsys.readouterr().err or True
+    out = tmp_path / "cycle.py"
+    assert main(["generate", str(path), "--target", "houdini", "-o", str(out)]) == 1
+    err = capsys.readouterr().err
+    assert "Cycle between nodes" in err
+    assert "nothing to generate" not in err
+    assert not out.exists()
+    assert compile_document(loads_graph(path.read_text(encoding="utf-8")), "houdini").code is None
+
+
+def test_dangling_edge_prints_the_diagnostic(tmp_path, capsys):
+    builder = geometry_passthrough("Dangle")
+    builder.link("Group Input", "Socket_0", "Group Output", "Socket_1")
+    builder.tree.edges.append(GraphEdge("Missing", "X", "Group Output", "Socket_1"))
+    path = tmp_path / "dangle.graph.json"
+    path.write_text(dumps_graph(builder.document()), encoding="utf-8")
+    out = tmp_path / "dangle.py"
+    assert main(["generate", str(path), "--target", "houdini", "-o", str(out)]) == 1
+    err = capsys.readouterr().err
+    assert "Link references a missing node (Missing -> Group Output)." in err
+    assert "nothing to generate" not in err
+    assert not out.exists()
 
 
 def test_missing_selection_keeps_geometry():
@@ -669,6 +687,34 @@ def test_compositor_mix_viewer_and_lift():
     grade.link("Image", "Image", "Grade", "Image").link("Grade", "Image", "Out", "Image")
     graded = compile_document(grade.document(), "unreal")
     assert "Vector4(0.2, 0.0, -0.2" in graded.code.code
+    houdini_grade = compile_document(grade.document(), "houdini")
+    assert '"lift", (1.2, 1.0, 0.8)' in houdini_grade.code.code
+
+
+def test_houdini_lift_is_combined_not_the_unreal_offset():
+    grade = TreeBuilder("Grade52", TreeKind.COMPOSITOR)
+    grade.node(
+        "Grade",
+        "CompositorNodeColorBalance",
+        inputs=[
+            socket("Image", COLOR),
+            socket("Base Lift", F, 0.0, name="Base Lift"),
+            socket("Color Lift", COLOR, [0.98, 1.0, 1.04], name="Color Lift"),
+            socket("Base Gamma", F, 1.0, name="Base Gamma"),
+            socket("Color Gamma", COLOR, [1, 1, 1], name="Color Gamma"),
+            socket("Base Gain", F, 1.0, name="Base Gain"),
+            socket("Color Gain", COLOR, [1, 1, 1], name="Color Gain"),
+        ],
+        outputs=[socket("Image", COLOR, output=True)],
+    )
+    grade.node("Image", "CompositorNodeImage", outputs=[socket("Image", COLOR, output=True)])
+    grade.node("Out", "CompositorNodeComposite", inputs=[socket("Image", COLOR)], outputs=[], is_active_output=True)
+    grade.link("Image", "Image", "Grade", "Image").link("Grade", "Image", "Out", "Image")
+    houdini = compile_document(grade.document(), "houdini")
+    unreal = compile_document(grade.document(), "unreal")
+    assert '"lift", (0.98, 1.0, 1.04)' in houdini.code.code
+    assert '"lift", (-0.02, 0.0, 0.04)' not in houdini.code.code
+    assert "Vector4(-0.02, 0.0, 0.04, 0.0)" in unreal.code.code
     holder = TreeBuilder("Hold", TreeKind.COMPOSITOR)
     holder.node("Image", "CompositorNodeImage", outputs=[socket("Image", COLOR, output=True)])
     holder.node("Mystery", "CompositorNodeCustom", inputs=[socket("Color", COLOR)], outputs=[socket("Image", COLOR, output=True)])
@@ -676,6 +722,28 @@ def test_compositor_mix_viewer_and_lift():
     holder.link("Image", "Image", "Mystery", "Color").link("Mystery", "Image", "Out", "Image")
     held = compile_document(holder.document(), "houdini").code.code
     assert "setInput" in held
+
+
+def test_several_colour_outputs_get_one_display_flag():
+    builder = TreeBuilder("Passes", TreeKind.COMPOSITOR)
+    builder.interface("Beauty", "Beauty", "OUTPUT", COLOR)
+    builder.interface("Diffuse", "Diffuse", "OUTPUT", COLOR)
+    builder.interface("Glossy", "Glossy", "OUTPUT", COLOR)
+    builder.group_io()
+    result = compile_document(builder.document(), "houdini")
+    outputs = [op for op in result.semantic.ops.values() if op.kind == "COMPOSITE_OUTPUT"]
+    assert [op.name for op in outputs] == ["Beauty", "Diffuse", "Glossy"]
+    assert [op.name for op in outputs if op.params.get("display")] == ["Beauty"]
+    assert result.code.code.count("setDisplayFlag(True)") == 1
+
+    image = TreeBuilder("ImagePass", TreeKind.COMPOSITOR)
+    image.interface("Beauty", "Beauty", "OUTPUT", COLOR)
+    image.interface("Image", "Image", "OUTPUT", COLOR)
+    image.group_io()
+    preferred = compile_document(image.document(), "houdini")
+    shown = [op.name for op in preferred.semantic.ops.values() if op.kind == "COMPOSITE_OUTPUT" and op.params.get("display")]
+    assert shown == ["Image"]
+    assert preferred.code.code.count("setDisplayFlag(True)") == 1
 
 
 def test_pcg_missing_source_connects_the_input():
