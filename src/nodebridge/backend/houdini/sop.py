@@ -237,7 +237,11 @@ class SopBuilder:
                 items = [math.degrees(items[0]), math.degrees(items[2]), -math.degrees(items[1])]
             return tuple(clean_number(v) for v in items)
         if isinstance(raw, (list, tuple)):
-            items, changed = finite_components(raw, 3)
+            # Average the supplied components. Padding to 3 first counts missing
+            # axes as zeros (so [1, 2] becomes 1.0 instead of 1.5). Non-finite
+            # values are still replaced with 0 before the division.
+            present = list(raw)[:3]
+            items, changed = finite_components(present, len(present) or 1)
             if changed:
                 self._warn_non_finite()
             raw = sum(items) / max(len(items), 1)
