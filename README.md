@@ -53,7 +53,7 @@ Requirements: **Blender 4.2 LTS or newer** (tested on 4.2 LTS, 4.5 LTS, and 5.2 
 
    This writes `dist/nodebridge-0.3.0.zip`.
 
-   The same zip is checked in at [`release/nodebridge-0.3.0.zip`](release/nodebridge-0.3.0.zip). CI builds it and uploads it as the `nodebridge-addon` artifact.
+   The same zip is checked in at [`release/nodebridge-0.3.0.zip`](release/nodebridge-0.3.0.zip). CI rebuilds it with `python tools/build_addon.py`, fails if `release/nodebridge-0.3.0.zip` differs from `src/nodebridge`, and uploads that build as the `nodebridge-addon` artifact.
 
 2. In Blender, open **Edit > Preferences > Get Extensions**.
 3. Click the **⌄** menu in the top-right corner and choose **Install from Disk…**

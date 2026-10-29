@@ -20,6 +20,8 @@ jobs:
         run: |
           python tools/regenerate_examples.py
           git diff --exit-code -- examples docs/support_matrix.md
+      - name: Checked-in add-on zip matches the source
+        run: python tools/build_addon.py --check
 
   lint:
     runs-on: ubuntu-latest
