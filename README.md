@@ -61,6 +61,14 @@ Requirements: **Blender 4.2 LTS or newer** (tested on 4.2 LTS, 4.5 LTS, and 5.2 
 
 You can also drag the zip into the Blender window. Blender itself validates the package (`blender --command extension validate dist/nodebridge-0.3.0.zip`).
 
+Optional pinned install of the 0.3.0 library from the release tag:
+
+```bash
+python -m pip install "nodebridge @ git+https://github.com/Plygonality/NodeBridge.git@v0.3.0"
+```
+
+Build the add-on zip from that tag with `python tools/build_addon.py` after checking out `v0.3.0`.
+
 ## Use it: Blender to Houdini
 
 1. Select an object that has a **Geometry Nodes** modifier. You can work from the **3D Viewport** or the **Geometry Node Editor**.
