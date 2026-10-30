@@ -193,6 +193,23 @@ def analyze_from_view3d(obj):
     check(result == {"FINISHED"} and settings.analyzed_tree == view_tree, "node editor and 3D View analyze the same tree")
 
 
+def _invoke_usd_export(filepath, marker):
+    """Call the USD export operator and treat an expected ERROR report as CANCELLED.
+
+    Blender's ``bpy.ops`` raises ``RuntimeError`` after ``execute`` returns
+    ``{'CANCELLED'}`` when the operator called ``self.report({'ERROR'}, ...)``.
+    The message is prefixed with ``Error:``. An unexpected exception still
+    propagates so a real failure is not recorded as a clean refusal.
+    """
+    try:
+        return bpy.ops.nodebridge.export_usd_bundle(filepath=filepath)
+    except RuntimeError as exc:
+        message = str(exc)
+        if marker not in message:
+            raise
+        return {"CANCELLED"}
+
+
 def check_usd_bundle(building_obj):
     """Export the evaluated building with Blender's USD operator and check the bundle."""
     import tempfile
@@ -201,10 +218,6 @@ def check_usd_bundle(building_obj):
     scene = bpy.context.scene
     settings = scene.nodebridge
     view_layer = bpy.context.view_layer
-    before_active = view_layer.objects.active.name if view_layer.objects.active else None
-    before_selected = sorted(obj.name for obj in view_layer.objects if obj.select_get())
-    before_mode = bpy.context.mode
-    hidden = building_obj.hide_viewport
     directory = tempfile.mkdtemp(prefix="nb-usd-")
     bundle = os.path.join(directory, "Building.nodebridge")
     settings.source_type = "GEOMETRY"
@@ -215,6 +228,12 @@ def check_usd_bundle(building_obj):
     settings.usd_scope = "OBJECT"
     settings.usd_preview_surface = False
     view_layer.objects.active = building_obj
+    # The exporter snapshots context when the operator runs and restores that
+    # snapshot. Record the baseline after the generator object is active.
+    before_active = view_layer.objects.active.name if view_layer.objects.active else None
+    before_selected = sorted(obj.name for obj in view_layer.objects if obj.select_get())
+    before_mode = bpy.context.mode
+    hidden = building_obj.hide_viewport
     check(hasattr(bpy.ops.nodebridge, "export_usd_bundle"), "USD export operator is registered")
     result = bpy.ops.nodebridge.export_usd_bundle(filepath=bundle)
     check(result == {"FINISHED"}, f"USD bundle export finished ({result}, {settings.usd_last_summary})")
@@ -237,11 +256,11 @@ def check_usd_bundle(building_obj):
     check(after_selected == before_selected, f"selection restored after USD export ({after_selected} vs {before_selected})")
     check(bpy.context.mode == before_mode, f"mode restored after USD export ({bpy.context.mode} vs {before_mode})")
     check(building_obj.hide_viewport == hidden, "visibility restored after USD export")
-    again = bpy.ops.nodebridge.export_usd_bundle(filepath=bundle)
+    again = _invoke_usd_export(bundle, "already exists")
     check(again == {"CANCELLED"}, "second export without replace is cancelled")
     check(manifest_path.is_file(), "first bundle remains after a refused replace")
     settings.source_type = "COMPOSITOR"
-    refused = bpy.ops.nodebridge.export_usd_bundle(filepath=os.path.join(directory, "Compositor.nodebridge"))
+    refused = _invoke_usd_export(os.path.join(directory, "Compositor.nodebridge"), "Geometry Nodes")
     check(refused == {"CANCELLED"}, "compositor source refuses USD bundle export")
     check(not Path(directory, "Compositor.nodebridge").exists(), "refused export does not leave a bundle")
     check(bpy.context.mode == before_mode, "mode restored after refused USD export")
