@@ -12,15 +12,15 @@ package works as a Blender 4.2+ extension (``bl_ext.*.nodebridge``), as a
 legacy add-on, and as a normal Python package.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 bl_info = {
     "name": "NodeBridge",
     "author": "NodeBridge Contributors",
-    "version": (0, 3, 0),
+    "version": (0, 4, 0),
     "blender": (4, 2, 0),
     "location": "3D View and Node Editor > Sidebar (N) > NodeBridge",
-    "description": "Compile Geometry, Shader and Compositor node trees into native Houdini or Unreal Engine 5 code.",
+    "description": "Compile Geometry, Shader and Compositor node trees into native Houdini or Unreal Engine 5 code, and optionally publish an OpenUSD scene bundle.",
     "category": "Node",
 }
 

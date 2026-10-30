@@ -1,0 +1,17 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    documentation = "Minimal stage used to exercise NodeBridge bundle packaging without Blender. This is not an export of the building example."
+)
+
+def Xform "World" (
+    kind = "component"
+)
+{
+    def Cube "Body"
+    {
+        double size = 2
+    }
+}

@@ -26,6 +26,22 @@ Target backend  (backend/houdini, backend/unreal)
 Generated code + translation report  (compiler/report.py)
 ```
 
+The same Semantic IR can be written to disk beside an optional USD scene.
+USD is not another step in the compiler:
+
+```
+Semantic IR                         Blender evaluated scene
+    |                                          |
+    | compile                                  | bpy.ops.wm.usd_export
+    v                                          v
+Houdini / Unreal native code            USD scene artifact
+    |                                          |
+    +-------------------+----------------------+
+                        |
+            NodeBridge bundle manifest
+            stable ids, source hashes, relative paths
+```
+
 ## Package layout
 
 ```
@@ -66,10 +82,14 @@ src/nodebridge/
     units.py               lengths, densities, angles, time / frames, value roles
     random.py              deterministic random(seed, id) in Python and VEX
     names.py               target-safe naming
-  cli.py                   command-line interface
+  interchange/             optional USD bundles: manifest, provenance, validation (no pxr)
+    usd/                   lazy pxr inspection, composition, and custom data
+  frontend/blender/usd_export.py
+                           Blender USD exporter adapter (imported only while exporting)
+  cli.py                   analyze, generate, capabilities, usd
 ```
 
-The add-on and the compiler are the same package. Only `addon/` and `frontend/blender/context.py` touch `bpy`, and only when Blender loads the add-on. All internal imports are relative, so the package works as a Blender extension (`bl_ext.<repo>.nodebridge`), as a legacy add-on, and as a normal Python package used by the CLI and tests.
+The add-on and the compiler are the same package. `bpy` is imported only from `addon/`, `frontend/blender/context.py`, and `frontend/blender/usd_export.py`, and only when those modules run inside Blender. `pxr` is imported only from `interchange/usd/` when a USD inspection or composition function runs. All internal imports are relative, so the package works as a Blender extension (`bl_ext.<repo>.nodebridge`), as a legacy add-on, and as a normal Python package used by the CLI and tests.
 
 ## Two intermediate representations
 
@@ -147,6 +167,14 @@ Strictness (*Exact only / Allow equivalent / Allow approximate*) never drops ope
 * **A new operation:** register an `OperationSpec`, add a lifter, add translators per backend.
 * **A new target** (Maya, Bifrost, Godot, Nuke, ...): subclass `TargetBackend`, register translators for its contexts, then call `register_backend`. The panel's target list, the capability matrix and the docs pick it up automatically.
 * **A new source** (a Houdini or Unreal frontend): subclass `SourceFrontend` and register lifters for that application's node types. Backends stay unchanged, which is how NodeBridge can become bidirectional.
+
+## OpenUSD is not a third intermediate representation
+
+Graph IR keeps source syntax. Semantic IR keeps procedural meaning (`SCATTER`, `INSTANCE`, `RANDOM_TRANSFORM`, and the rest). An OpenUSD stage keeps an evaluated scene: prims, transforms, meshes, and some shading bindings.
+
+NodeBridge 0.4 can publish both. The bundle manifest ties the USD file to the serialized IR and to any generated Houdini or Unreal script with stable ids and SHA-256 hashes. Opening the USD stage does not rebuild the node tree. Running the generated script does not import the USD mesh. Those are two deliverables. See [openusd_integration.md](openusd_integration.md) and [bundle_schema.md](bundle_schema.md).
+
+`interchange` does not import `pxr` or `bpy` at import time. Stage inspection and layered composition import `pxr` only when those functions run. The Blender exporter imports `bpy` only when the add-on calls it.
 
 ## Design choices
 

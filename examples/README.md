@@ -14,3 +14,5 @@ blender --background --factory-startup --python examples/blender/build_examples.
 | [`compositor/`](compositor/) | Scene compositor: Render Layers → Glare (fog glow) → Color Balance → Multiply with a blurred Ellipse Mask (vignette) → Composite | same |
 
 `generated_houdini.py` and `generated_unreal.py` are exactly what the add-on's **Generate Code** button produces for these trees. The tests compare against them. Regenerate them with `python tools/regenerate_examples.py`.
+
+[`openusd/`](openusd/) holds a one-cube USDA stage for `nodebridge usd package`. It is not a Blender export of the building. The building's evaluated USD scene is written by **Export USD Bundle** inside Blender.
