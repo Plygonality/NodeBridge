@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "nodebridge"
-version = "0.3.0"
+version = "0.4.0"
 name = "NodeBridge"
-tagline = "Compile node trees into native Houdini and Unreal code"
+tagline = "Native Houdini and Unreal code, plus optional OpenUSD bundles"
 maintainer = "NodeBridge Contributors"
 type = "add-on"
 website = "https://github.com/Plygonality/NodeBridge"
@@ -12,7 +12,7 @@ blender_version_min = "4.2.0"
 license = ["SPDX:MIT"]
 
 [permissions]
-files = "Save generated scripts to disk"
+files = "Save generated scripts and OpenUSD bundles to disk"
 clipboard = "Copy generated code and translation reports"
 
 [build]

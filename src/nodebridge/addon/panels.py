@@ -127,6 +127,35 @@ def draw_generate(self, context):
             col.label(text=chunk)
 
 
+def _pxr_available() -> bool:
+    from ..interchange.usd.availability import pxr_available
+
+    return pxr_available()
+
+
+def draw_openusd(self, context):
+    layout = self.layout
+    settings = context.scene.nodebridge
+    layout.prop(settings, "usd_scope", text="Scope")
+    layout.prop(settings, "usd_include_script", text="Include Native Target Script")
+    layered = layout.row()
+    layered.enabled = _pxr_available()
+    layered.prop(settings, "usd_layered", text="Layered USD")
+    if not _pxr_available():
+        note = layout.column(align=True)
+        for chunk in _wrap_to_region("Layered composition needs optional pxr. A basic bundle still uses Blender's USD exporter.", context):
+            note.label(text=chunk)
+    layout.prop(settings, "usd_replace", text="Replace Existing Bundle")
+    layout.prop(settings, "usd_preview_surface", text="UsdPreviewSurface (limited)")
+    row = layout.row()
+    row.scale_y = 1.4
+    row.operator("nodebridge.export_usd_bundle", icon="EXPORT")
+    if settings.usd_last_summary:
+        col = layout.column(align=True)
+        for chunk in _wrap_to_region(settings.usd_last_summary, context):
+            col.label(text=chunk)
+
+
 def draw_advanced(self, context):
     layout = self.layout
     s = context.scene.nodebridge
@@ -183,6 +212,7 @@ _SPECS = (
     ("analysis", "Analysis", draw_analysis, "main", poll_analysis, None, None),
     ("warnings", "Warnings", draw_warnings, "main", poll_warnings, None, draw_warnings_header),
     ("generate", "Generate", draw_generate, "main", None, None, None),
+    ("openusd", "OpenUSD", draw_openusd, "main", None, None, None),
     ("advanced", "Advanced", draw_advanced, "main", None, {"DEFAULT_CLOSED"}, None),
 )
 

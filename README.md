@@ -51,23 +51,24 @@ Requirements: **Blender 4.2 LTS or newer** (tested on 4.2 LTS, 4.5 LTS, and 5.2 
    python tools/build_addon.py
    ```
 
-   This writes `dist/nodebridge-0.3.0.zip`.
+   This writes `dist/nodebridge-0.4.0.zip`.
 
-   The same zip is checked in at [`release/nodebridge-0.3.0.zip`](release/nodebridge-0.3.0.zip). CI rebuilds it with `python tools/build_addon.py`, fails if `release/nodebridge-0.3.0.zip` differs from `src/nodebridge`, and uploads that build as the `nodebridge-addon` artifact.
+   The same zip is checked in at [`release/nodebridge-0.4.0.zip`](release/nodebridge-0.4.0.zip). CI rebuilds it with `python tools/build_addon.py`, fails if `release/nodebridge-0.4.0.zip` differs from `src/nodebridge`, and uploads that build as the `nodebridge-addon` artifact.
 
 2. In Blender, open **Edit > Preferences > Get Extensions**.
 3. Click the **⌄** menu in the top-right corner and choose **Install from Disk…**
-4. Select `nodebridge-0.3.0.zip`. NodeBridge is installed and enabled.
+4. Select `nodebridge-0.4.0.zip`. NodeBridge is installed and enabled.
 
-You can also drag the zip into the Blender window. Blender itself validates the package (`blender --command extension validate dist/nodebridge-0.3.0.zip`).
+You can also drag the zip into the Blender window. Blender itself validates the package (`blender --command extension validate dist/nodebridge-0.4.0.zip`).
 
-Optional pinned install of the 0.3.0 library from the release tag:
+The previous add-on zip remains at `release/nodebridge-0.3.0.zip`. This repository does not publish a GitHub Release by itself.
+
+Library install from a checkout, with the optional OpenUSD extra when you want stage inspection:
 
 ```bash
-python -m pip install "nodebridge @ git+https://github.com/Plygonality/NodeBridge.git@v0.3.0"
+python -m pip install -e ".[dev]"
+python -m pip install -e ".[usd]"
 ```
-
-Build the add-on zip from that tag with `python tools/build_addon.py` after checking out `v0.3.0`.
 
 ## Use it: Blender to Houdini
 
@@ -96,6 +97,22 @@ Steps 1 to 7 are the same, with **Target** set to **Unreal Engine 5**. Then:
 5. Set `SPAWN_PCG_VOLUME = True` at the top of the script to also place a PCG Volume that uses the new graph.
 
 The PCG Python API is experimental (UE 5.4+). Generated scripts only call documented editor APIs. Anything your editor version does not expose is logged as a `NodeBridge:` warning instead of being faked.
+
+## Publish an OpenUSD bundle
+
+USD is an evaluated scene you can open in another DCC. It is not a third target next to Houdini and Unreal, and it does not contain the executable node tree. The bundle keeps both:
+
+* the USD scene Blender exported from the evaluated object
+* the Graph IR, Semantic IR, translation report, and optional native script NodeBridge already produces
+
+1. Select the object with the Geometry Nodes modifier. In `examples/nodebridge_examples.blend`, that is **Building**.
+2. In the **NodeBridge** sidebar, set **Target** to **Houdini** (or Unreal) and click **Analyze Graph**.
+3. Open the **OpenUSD** section. Leave **Scope** on **Generator Object**. Leave **Include Native Target Script** on if the bundle should contain the generated script. **Layered USD** is available only when `pxr` imports.
+4. Click **Export USD Bundle** and choose `Building.nodebridge`.
+
+The folder contains `scene.usdc`, `procedural/source.graph.json`, `procedural/generator.semantic.json`, the report, `procedural/houdini.py` when the script was included, and `manifest.json`. Open `scene.usdc` in a USD reader. Run the Python file in Houdini or Unreal to rebuild the procedural system. Changing a parameter there does not edit the imported USD mesh, and importing the USD mesh does not rebuild the node tree.
+
+Without Blender, `nodebridge usd package` only wraps a USD file you already have. `examples/openusd/cube.usda` is a stand-in cube for that command, not the building mesh. Details, the manifest, and the commands are in [docs/openusd_integration.md](docs/openusd_integration.md) and [docs/bundle_schema.md](docs/bundle_schema.md).
 
 ---
 
@@ -192,7 +209,8 @@ Any other node becomes an `UNSUPPORTED_OPERATION`: it is reported, and a placeho
 
 * **Blender side (verified):** the parser, the add-on UI, the operators and the extension package were run in real **Blender 4.2.23 LTS and 4.5.14 LTS**, both in background and in the GUI. The clipboard copy was checked against the system clipboard. Node socket identifiers and properties were probed in both versions. The same background checks, and the GUI operators used for the screenshots above, were run again in **Blender 5.2.2 LTS**. Compositor sockets that 5.2 moved onto menus (Glare type and quality, the composite group output) were probed there.
 * **Generated code (structurally verified):** every generated Houdini and Unreal script is parsed, then executed against recording stand-ins for `hou` and `unreal` (in `tests/fakes/`). Those stand-ins check call shapes, wiring and pin labels.
-* **Not yet verified in a live Houdini or Unreal session.** No Houdini or Unreal licence was available while building 0.3. API usage follows the documented `hou` and Unreal Python APIs, and version-sensitive calls are guarded. Some SOP / COP2 parameter names and Unreal PCG property names may differ in your version: the script reports them as warnings instead of failing. That gap is recorded in [examples/live_sessions.md](examples/live_sessions.md). Running the four examples in real Houdini 20.x and Unreal 5.4+ is the top item on the [roadmap](docs/roadmap.md).
+* **Not yet verified in a live Houdini or Unreal session.** No Houdini or Unreal licence was available while building 0.3 or 0.4. API usage follows the documented `hou` and Unreal Python APIs, and version-sensitive calls are guarded. Some SOP / COP2 parameter names and Unreal PCG property names may differ in your version: the script reports them as warnings instead of failing. That gap is recorded in [examples/live_sessions.md](examples/live_sessions.md). Running the four examples in real Houdini 20.x and Unreal 5.4+ is the top item on the [roadmap](docs/roadmap.md). The 0.4 USD bundle does not substitute for that run.
+* **OpenUSD (0.4):** bundle manifests, path checks, and CLI packaging are tested in Python. Stage inspection, layered references, custom data, and comparison are tested with `usd-core` 26.11 (`pxr`) on CPython 3.12. `usdchecker` is not part of that wheel and was not run. A live Blender `wm.usd_export` run is implemented and covered by `tests/blender/run_in_blender.py`; it runs when `NODEBRIDGE_BLENDER` is set and was not run in an environment without Blender.
 * **Randomness:** the NodeBridge hash is identical in Python and VEX. The test suite compiles the generated VEX library as C and compares it with Python. Blender's own random sequence is not reproduced, so random-dependent operations are classified EQUIVALENT.
 
 ## Known limitations
@@ -204,22 +222,26 @@ Any other node becomes an `UNSUPPORTED_OPERATION`: it is reported, and a placeho
 * Simulation, Repeat and For Each zones, matrix sockets, menu switches, edge-domain attributes, volume shading and displacement are not translated.
 * Houdini compositing targets COP2, not Houdini 20.5's Copernicus. Glare is an approximate glow (lumakey, bright, blur, over). The vignette is a blurred circle multiplied over the image. Lens distortion and a general color-correction node still have no COP2 translator. Unreal compositing is limited to Post Process Volume settings.
 * On Unreal, mesh modelling (extrude, curves, subdivision) stays unsupported. The extruded building is a Houdini result. The report says so in one sentence. PCG parameters are still script-level constants until a live Unreal session confirms that API.
+* USD export is Blender's evaluated scene, not a reconstruction of the node tree. Per-face Geometry Nodes provenance is not available, so the manifest maps the asset, not each face. Shader translation is still the Houdini MaterialX network script or the Unreal Material script. NodeBridge does not write a `.mtlx` file or a UsdShade network in 0.4.
 
 ---
 
 ## Command line and development
 
-The compiler is pure Python (3.11+) with no dependencies, and it never imports `bpy` outside the add-on.
+The compiler is pure Python (3.11+) with no dependencies. It does not import `bpy` or `pxr`. The add-on and the USD export adapter import `bpy` only while Blender is running.
 
 ```bash
 python -m pip install -e ".[dev]"
-python -m pytest                                    # 86 passed, 1 skipped without NODEBRIDGE_BLENDER
+python -m pytest                                    # 137 passed, 1 skipped without NODEBRIDGE_BLENDER when usd-core is installed
 NODEBRIDGE_BLENDER=/path/to/blender python -m pytest tests/test_blender_integration.py
 
 nodebridge analyze  examples/scatter/scatter.graph.json --target houdini
 nodebridge generate examples/scatter/scatter.graph.json --target unreal -o scatter_unreal.py
 nodebridge capabilities --markdown
+nodebridge usd validate /tmp/Building.nodebridge
 ```
+
+`usd inspect`, `usd package`, and `usd compare` are documented in [docs/openusd_integration.md](docs/openusd_integration.md). `package` copies an existing USD file. It does not evaluate a `.graph.json`.
 
 Graph IR fixtures are exported from Blender with the add-on's **Advanced > Debug Output** option, or with `tests/blender/run_in_blender.py --export-fixtures DIR`. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add operations, lifters, translators and backends.
 
@@ -228,6 +250,8 @@ NodeBridge works without any AI service. An optional `TranslationFallbackProvide
 ## Documentation
 
 * [Architecture](docs/architecture.md)
+* [OpenUSD integration](docs/openusd_integration.md)
+* [Bundle schema](docs/bundle_schema.md)
 * [Support matrix](docs/support_matrix.md) (generated)
 * [Roadmap](docs/roadmap.md)
 * [Repository audit for the 0.3 rebuild](docs/audit.md)

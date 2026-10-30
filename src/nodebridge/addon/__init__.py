@@ -1,8 +1,8 @@
 """Blender add-on UI. Contains no translation logic; it calls the compiler."""
 
-from . import operators, panels, properties
+from . import operators, panels, properties, usd_operator
 
-MODULES = (properties, operators, panels)
+MODULES = (properties, operators, usd_operator, panels)
 
 
 def register() -> None:

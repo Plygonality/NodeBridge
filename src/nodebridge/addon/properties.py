@@ -66,6 +66,34 @@ class NODEBRIDGE_PG_settings(PropertyGroup):
     code_lines: IntProperty()
     run_instructions: StringProperty()
 
+    usd_scope: EnumProperty(
+        name="USD Scope",
+        items=[
+            ("OBJECT", "Generator Object", "Export only the object that owns the Geometry Nodes modifier"),
+            ("SELECTED", "Selected", "Export the current selection, including the generator object"),
+            ("SCENE", "Visible Scene", "Export visible scene objects. This can include objects outside the generator"),
+        ],
+        default="OBJECT",
+    )
+    usd_include_script: BoolProperty(
+        name="Include Native Target Script",
+        default=True,
+        description="Generate the selected Houdini or Unreal script and store it in the bundle. The script is not executed",
+    )
+    usd_layered: BoolProperty(
+        name="Layered USD",
+        default=False,
+        description="Write a scene.usda root that references the exported geometry. Requires the optional pxr bindings",
+    )
+    usd_replace: BoolProperty(name="Replace Existing Bundle", default=False, description="Overwrite an existing NodeBridge bundle at the chosen path")
+    usd_preview_surface: BoolProperty(
+        name="UsdPreviewSurface",
+        default=False,
+        description="Ask Blender for a UsdPreviewSurface fallback when this Blender version supports that export flag. This is not a shader translation",
+    )
+    usd_last_path: StringProperty()
+    usd_last_summary: StringProperty()
+
 
 CLASSES = (NODEBRIDGE_PG_message, NODEBRIDGE_PG_settings)
 

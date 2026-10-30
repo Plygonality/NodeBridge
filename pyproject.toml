@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nodebridge"
-version = "0.3.0"
-description = "Cross-DCC procedural compiler: Blender node trees to native Houdini and Unreal Engine 5 code"
+version = "0.4.0"
+description = "Cross-DCC procedural compiler: Blender node trees to native Houdini and Unreal Engine 5 code, with optional OpenUSD scene bundles"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "NodeBridge Contributors" }]
-keywords = ["blender", "houdini", "unreal", "pcg", "geometry-nodes", "procedural", "compiler", "blender-addon"]
+keywords = ["blender", "houdini", "unreal", "openusd", "usd", "pcg", "geometry-nodes", "procedural", "compiler", "blender-addon"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -25,6 +25,9 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.6"]
+# Optional. usd-core 26.11 imports on CPython 3.12 and publishes wheels for 3.11-3.14.
+# A DCC that already ships pxr can provide the module instead of this extra.
+usd = ["usd-core>=26.11"]
 
 [project.scripts]
 nodebridge = "nodebridge.cli:main"

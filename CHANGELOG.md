@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.0 - 2026-10-30
+
+Optional OpenUSD scene bundles. The compiler is unchanged: Graph IR and Semantic IR still drive Houdini and Unreal code. USD is an evaluated scene plus provenance, not a third procedural backend.
+
+### Added
+
+- A pure-Python bundle (`manifest.json`, Graph IR, Semantic IR, translation report, optional native scripts) that validates without Blender or `pxr`.
+- Stable generator, group, and operation ids, separate from content revisions and from the bundle publication hash.
+- Blender **Export USD Bundle** in the NodeBridge sidebar. It calls the running Blender's `wm.usd_export` on the evaluated Geometry Nodes object, then restores selection, mode, and visibility.
+- CLI: `nodebridge usd inspect`, `validate`, `package`, and `compare`. `analyze`, `generate`, and `capabilities` are unchanged.
+- When `pxr` is installed: stage inspection, a layered `scene.usda` that references the geometry layer, namespaced `customData`, and an experimental `UsdProc.GenerativeProcedural` marker that generic DCCs do not evaluate.
+- Optional extra `nodebridge[usd]` (`usd-core>=26.11`). The add-on zip does not ship the USD SDK.
+- Example scripts regenerated so the header reads NodeBridge 0.4.0. Reports and the support matrix are unchanged. Graph IR fixtures keep the `nodebridge_version` they were exported with.
+- [OpenUSD integration](docs/openusd_integration.md) and the [bundle schema](docs/bundle_schema.md).
+
+### Not in this release
+
+- Live Houdini 20.x and Unreal 5.4+ execution of the generated scripts. Still unverified.
+- Reconstructing a Geometry Nodes, SOP, or PCG graph from USD geometry.
+- A portable `.mtlx` document or a UsdShade translation of the shader backends.
+- Custom USD schema plugins, Hydra, or a C++ file-format plugin.
+
 ## 0.3.0 - 2026-10-29
 
 First tagged release. The tag to create is `v0.3.0`. `archive/milestone-1` (at `8adf232d`) is an archive marker, not a release.
